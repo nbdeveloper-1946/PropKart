@@ -1876,7 +1876,7 @@ class StatusPieChartPainter extends CustomPainter {
         final gapAdjusted = sweepAngle > 0.05 ? sweepAngle - 0.04 : sweepAngle;
         // Soft radial gradient (lighter core, richer edge) for a subtle glassy feel.
         paint.shader = RadialGradient(
-          colors: [color.withOpacity(0.7), color],
+          colors: [color.withValues(alpha: 0.7), color],
           stops: const [0.35, 1.0],
         ).createShader(arcRect);
         canvas.drawArc(arcRect, startAngle, gapAdjusted, false, paint);

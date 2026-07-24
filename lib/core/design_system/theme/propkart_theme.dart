@@ -282,8 +282,11 @@ class PropKartTheme {
   static ThemeData dark() => _build(Brightness.dark, PropKartColors.dark());
 
   static ThemeData _build(Brightness brightness, PropKartColors colors) {
-    final scheme = ColorScheme(
+    // fromSeed fills every Material 3 role (avoids null.withOpacity crashes on web).
+    final scheme = ColorScheme.fromSeed(
+      seedColor: colors.primary,
       brightness: brightness,
+    ).copyWith(
       primary: colors.primary,
       onPrimary: Colors.white,
       secondary: colors.secondary,
@@ -292,9 +295,19 @@ class PropKartTheme {
       onError: Colors.white,
       surface: colors.surface,
       onSurface: colors.text,
+      onSurfaceVariant: colors.textSecondary,
       surfaceContainerHighest: colors.surfaceElevated,
+      surfaceContainerHigh: colors.surfaceElevated,
+      surfaceContainer: colors.surface,
+      surfaceContainerLow: colors.groupedBackground,
+      surfaceContainerLowest: colors.background,
       outline: colors.border,
+      outlineVariant: colors.divider,
+      shadow: colors.shadow,
+      scrim: colors.overlay,
     );
+
+    final borderSoft = colors.border.withValues(alpha: 0.6);
 
     return ThemeData(
       useMaterial3: true,
@@ -318,7 +331,7 @@ class PropKartTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-          side: BorderSide(color: colors.border.withOpacity(0.6), width: 0.5),
+          side: BorderSide(color: borderSoft, width: 0.5),
         ),
         shadowColor: colors.shadow,
       ),
