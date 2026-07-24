@@ -107,7 +107,22 @@ class BuildPropertyDetailWidget extends StatelessWidget {
       specsItems.add(PropertyDetailItem('Floor', floorStr, Icons.layers_outlined));
     }
     if (property.ageOfProperty != null && property.ageOfProperty! > 0) {
-      specsItems.add(PropertyDetailItem('Property Age', '${property.ageOfProperty} years', Icons.hourglass_empty_rounded));
+      final ageVal = property.ageOfProperty!;
+      String ageDisplay;
+      if (ageVal <= 1) {
+        ageDisplay = '0 to 1 years';
+      } else if (ageVal <= 5) {
+        ageDisplay = '1 to 5 years';
+      } else if (ageVal <= 10) {
+        ageDisplay = '5 to 10 years';
+      } else if (ageVal <= 14) {
+        ageDisplay = '10+ years';
+      } else if (ageVal <= 19) {
+        ageDisplay = '15+ years';
+      } else {
+        ageDisplay = '20+ years';
+      }
+      specsItems.add(PropertyDetailItem('Property Age', ageDisplay, Icons.hourglass_empty_rounded));
     }
     if (property.superBuiltupArea != null && property.superBuiltupArea! > 0) {
       specsItems.add(PropertyDetailItem('Super Built-up Area', '${property.superBuiltupArea!.toStringAsFixed(0)} Sq. Ft.', Icons.square_foot_outlined));
@@ -213,8 +228,7 @@ class BuildPropertyDetailWidget extends StatelessWidget {
                     if (showHeaderClose)
                       CRMButton(
                         label: 'Close',
-                        variant: CRMButtonVariant.outline,
-                        prefixIcon: Icons.close_rounded,
+                        variant: CRMButtonVariant.danger,
                         height: 40,
                         onPressed: () => Navigator.pop(context),
                       ),

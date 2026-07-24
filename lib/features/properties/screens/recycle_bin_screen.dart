@@ -31,6 +31,11 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   List<PropertyModel> _binProperties = [];
   List<RequirementModel> _binRequirements = [];
 
+  int _propertiesPerPage = 15;
+  int _requirementsPerPage = 15;
+  int _currentPropertiesPage = 1;
+  int _currentRequirementsPage = 1;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +59,10 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   }
 
   Future<void> _fetchBinData() async {
+    setState(() {
+      _currentPropertiesPage = 1;
+      _currentRequirementsPage = 1;
+    });
     if (_selectedTab == 'Properties') {
       await _fetchBinProperties();
     } else {
@@ -446,114 +455,158 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                   : _selectedTab == 'Properties'
                       ? _binProperties.isEmpty
                           ? _buildEmptyState('Properties deleted from active listings will appear here.')
-                          : CRMDataTable(
-                              isLoading: false,
-                              showCheckboxColumn: false,
-                              dataRowMinHeight: 56.0,
-                              dataRowMaxHeight: 64.0,
-                              columns: const [
-                                DataColumn(label: Text('Code')),
-                                DataColumn(label: Text('Property Name')),
-                                DataColumn(label: Text('Owner')),
-                                DataColumn(label: Text('Area')),
-                                DataColumn(label: Text('Price')),
-                                DataColumn(label: Text('Actions')),
-                              ],
-                              rows: _binProperties.map((p) {
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(p.propertyCode, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                    DataCell(Text(p.title)),
-                                    DataCell(Text(p.ownerName)),
-                                    DataCell(Text(p.areaName)),
-                                    DataCell(Text(CRMCurrencyFormatter.formatShort(p.price), style: const TextStyle(fontWeight: FontWeight.w600))),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
-                                            tooltip: 'Restore Property',
-                                            onPressed: () => _restoreProperty(p.id),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
-                                            tooltip: 'Permanently Delete',
-                                            onPressed: () => _permanentDeleteProperty(p.id),
-                                          ),
-                                        ],
-                                      ),
+                          : Builder(
+                              builder: (context) {
+                                final totalItems = _binProperties.length;
+                                final totalPages = (totalItems / _propertiesPerPage).ceil().clamp(1, double.infinity).toInt();
+                                final startIndex = (_currentPropertiesPage - 1) * _propertiesPerPage;
+                                final endIndex = (startIndex + _propertiesPerPage).clamp(0, totalItems);
+                                final paginatedProperties = _binProperties.sublist(startIndex, endIndex);
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    CRMDataTable(
+                                      showDecoration: false,
+                                      isLoading: false,
+                                      showCheckboxColumn: false,
+                                      dataRowMinHeight: 56.0,
+                                      dataRowMaxHeight: 64.0,
+                                      columns: const [
+                                        DataColumn(label: Text('Code')),
+                                        DataColumn(label: Text('Property Name')),
+                                        DataColumn(label: Text('Owner')),
+                                        DataColumn(label: Text('Area')),
+                                        DataColumn(label: Text('Price')),
+                                        DataColumn(label: Text('Actions')),
+                                      ],
+                                      rows: paginatedProperties.map((p) {
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(Text(p.propertyCode, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                            DataCell(Text(p.title)),
+                                            DataCell(Text(p.ownerName)),
+                                            DataCell(Text(p.areaName)),
+                                            DataCell(Text(CRMCurrencyFormatter.formatShort(p.price), style: const TextStyle(fontWeight: FontWeight.w600))),
+                                            DataCell(
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
+                                                    tooltip: 'Restore Property',
+                                                    onPressed: () => _restoreProperty(p.id),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  IconButton(
+                                                    icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                                    tooltip: 'Permanently Delete',
+                                                    onPressed: () => _permanentDeleteProperty(p.id),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                    ),
+                                    const SizedBox(height: CRMSpacing.m),
+                                    _buildPropertiesPagination(
+                                      totalItems,
+                                      totalPages,
+                                      _currentPropertiesPage,
                                     ),
                                   ],
                                 );
-                              }).toList(),
+                              },
                             )
                       : _binRequirements.isEmpty
                           ? _buildEmptyState('Requirements deleted from active pipeline will appear here.')
-                          : CRMDataTable(
-                              isLoading: false,
-                              showCheckboxColumn: false,
-                              dataRowMinHeight: 56.0,
-                              dataRowMaxHeight: 64.0,
-                              columns: const [
-                                DataColumn(label: Text('Client Name')),
-                                DataColumn(label: Text('Specs / Config')),
-                                DataColumn(label: Text('Budget Range')),
-                                DataColumn(label: Text('Target Area(s)')),
-                                DataColumn(label: Text('Actions')),
-                              ],
-                              rows: _binRequirements.map((r) {
-                                final budgetRange = '${CRMCurrencyFormatter.formatShort(r.minBudget)} - ${CRMCurrencyFormatter.formatShort(r.maxBudget)}';
-                                return DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(r.clientName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          Text(r.clientMobile, style: TextStyle(color: CRMColors.textMutedOf(context), fontSize: 11)),
-                                        ],
-                                      ),
+                          : Builder(
+                              builder: (context) {
+                                final totalItems = _binRequirements.length;
+                                final totalPages = (totalItems / _requirementsPerPage).ceil().clamp(1, double.infinity).toInt();
+                                final startIndex = (_currentRequirementsPage - 1) * _requirementsPerPage;
+                                final endIndex = (startIndex + _requirementsPerPage).clamp(0, totalItems);
+                                final paginatedRequirements = _binRequirements.sublist(startIndex, endIndex);
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    CRMDataTable(
+                                      showDecoration: false,
+                                      isLoading: false,
+                                      showCheckboxColumn: false,
+                                      dataRowMinHeight: 56.0,
+                                      dataRowMaxHeight: 64.0,
+                                      columns: const [
+                                        DataColumn(label: Text('Client Name')),
+                                        DataColumn(label: Text('Specs / Config')),
+                                        DataColumn(label: Text('Budget Range')),
+                                        DataColumn(label: Text('Target Area(s)')),
+                                        DataColumn(label: Text('Actions')),
+                                      ],
+                                      rows: paginatedRequirements.map((r) {
+                                        final budgetRange = '${CRMCurrencyFormatter.formatShort(r.minBudget)} - ${CRMCurrencyFormatter.formatShort(r.maxBudget)}';
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(r.clientName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                  Text(r.clientMobile, style: TextStyle(color: CRMColors.textMutedOf(context), fontSize: 11)),
+                                                ],
+                                              ),
+                                            ),
+                                            DataCell(Text('${r.propertyTypeName} (${r.configurationName ?? "-"})')),
+                                            DataCell(Text(budgetRange, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                            DataCell(
+                                              SizedBox(
+                                                width: 160,
+                                                child: Tooltip(
+                                                  message: r.areaNames.join(', '),
+                                                  child: Text(
+                                                    r.areaNames.join(', '),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(color: CRMColors.textSecondaryOf(context), fontSize: 13),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
+                                                    tooltip: 'Restore Requirement',
+                                                    onPressed: () => _restoreRequirement(r.id),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  IconButton(
+                                                    icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                                    tooltip: 'Permanently Delete',
+                                                    onPressed: () => _permanentDeleteRequirement(r.id),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
                                     ),
-                                    DataCell(Text('${r.propertyTypeName} (${r.configurationName ?? "-"})')),
-                                    DataCell(Text(budgetRange, style: const TextStyle(fontWeight: FontWeight.w600))),
-                                    DataCell(
-                                      SizedBox(
-                                        width: 160,
-                                        child: Tooltip(
-                                          message: r.areaNames.join(', '),
-                                          child: Text(
-                                            r.areaNames.join(', '),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(color: CRMColors.textSecondaryOf(context), fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
-                                            tooltip: 'Restore Requirement',
-                                            onPressed: () => _restoreRequirement(r.id),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
-                                            tooltip: 'Permanently Delete',
-                                            onPressed: () => _permanentDeleteRequirement(r.id),
-                                          ),
-                                        ],
-                                      ),
+                                    const SizedBox(height: CRMSpacing.m),
+                                    _buildRequirementsPagination(
+                                      totalItems,
+                                      totalPages,
+                                      _currentRequirementsPage,
                                     ),
                                   ],
                                 );
-                              }).toList(),
+                              },
                             ),
             ),
           ],
@@ -584,6 +637,148 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPropertiesPagination(int totalItems, int totalPages, int currentPage) {
+    final from = totalItems == 0 ? 0 : (currentPage - 1) * _propertiesPerPage + 1;
+    final to = (currentPage * _propertiesPerPage).clamp(0, totalItems);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 500;
+
+    final infoText = Text(
+      'Showing $from–$to of $totalItems',
+      style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+    );
+
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows:',
+            style:
+                CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
+        const SizedBox(width: CRMSpacing.xs),
+        DropdownButton<int>(
+          value: _propertiesPerPage,
+          underline: const SizedBox.shrink(),
+          items: const [
+            DropdownMenuItem(value: 15, child: Text('15')),
+            DropdownMenuItem(value: 30, child: Text('30')),
+            DropdownMenuItem(value: 50, child: Text('50')),
+          ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() {
+              _propertiesPerPage = val;
+              _currentPropertiesPage = 1;
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed:
+              currentPage > 1 ? () => setState(() => _currentPropertiesPage--) : null,
+        ),
+        Text(
+          '$currentPage / $totalPages',
+          style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: currentPage < totalPages
+              ? () => setState(() => _currentPropertiesPage++)
+              : null,
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          infoText,
+          const SizedBox(height: CRMSpacing.s),
+          controls,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        infoText,
+        controls,
+      ],
+    );
+  }
+
+  Widget _buildRequirementsPagination(int totalItems, int totalPages, int currentPage) {
+    final from = totalItems == 0 ? 0 : (currentPage - 1) * _requirementsPerPage + 1;
+    final to = (currentPage * _requirementsPerPage).clamp(0, totalItems);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 500;
+
+    final infoText = Text(
+      'Showing $from–$to of $totalItems',
+      style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+    );
+
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows:',
+            style:
+                CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
+        const SizedBox(width: CRMSpacing.xs),
+        DropdownButton<int>(
+          value: _requirementsPerPage,
+          underline: const SizedBox.shrink(),
+          items: const [
+            DropdownMenuItem(value: 15, child: Text('15')),
+            DropdownMenuItem(value: 30, child: Text('30')),
+            DropdownMenuItem(value: 50, child: Text('50')),
+          ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() {
+              _requirementsPerPage = val;
+              _currentRequirementsPage = 1;
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed:
+              currentPage > 1 ? () => setState(() => _currentRequirementsPage--) : null,
+        ),
+        Text(
+          '$currentPage / $totalPages',
+          style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: currentPage < totalPages
+              ? () => setState(() => _currentRequirementsPage++)
+              : null,
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          infoText,
+          const SizedBox(height: CRMSpacing.s),
+          controls,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        infoText,
+        controls,
+      ],
     );
   }
 }

@@ -413,16 +413,18 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   }
 
   void _nextStep() {
-    if (_activeStep < 6) {
-      setState(() {
-        _activeStep++;
-      });
-      _pageController.nextPage(
-        duration: CRMMotion.pageTransition,
-        curve: CRMMotion.easeInOut,
-      );
-    } else {
-      _submitForm();
+    if (_formKey.currentState!.validate()) {
+      if (_activeStep < 6) {
+        setState(() {
+          _activeStep++;
+        });
+        _pageController.nextPage(
+          duration: CRMMotion.pageTransition,
+          curve: CRMMotion.easeInOut,
+        );
+      } else {
+        _submitForm();
+      }
     }
   }
 
@@ -439,6 +441,11 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   }
 
   void _jumpToStep(int step) {
+    if (step > _activeStep) {
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+    }
     setState(() {
       _activeStep = step;
     });
@@ -662,7 +669,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
           const SizedBox(height: CRMSpacing.m),
           CRMPhoneField(
             controller: _mobileController,
-            labelText: 'Client Mobile *',
+            labelText: 'Client Mobile',
             isRequired: true,
           ),
           if (_customerFoundMessage != null) ...[
@@ -875,31 +882,46 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   }
 
   Widget _buildStep4Location() {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 500;
+
+    final titleWidget = Text("Step 4: Target Area(s) *", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold));
+    final filterWidget = SizedBox(
+      width: isMobile ? double.infinity : 160,
+      height: 32,
+      child: TextField(
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'Filter areas...',
+          prefixIcon: const Icon(Icons.search_rounded, size: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          filled: true,
+          fillColor: CRMColors.backgroundOf(context),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+        ),
+        onChanged: (val) => setState(() => _areaSearchQuery = val.trim()),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text("Step 4: Target Area(s) *", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            SizedBox(
-              width: 160,
-              height: 32,
-              child: TextField(
-                style: const TextStyle(fontSize: 12),
-                decoration: InputDecoration(
-                  hintText: 'Filter areas...',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 14),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  filled: true,
-                  fillColor: CRMColors.backgroundOf(context),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-                ),
-                onChanged: (val) => setState(() => _areaSearchQuery = val.trim()),
+        isMobile
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  titleWidget,
+                  const SizedBox(height: CRMSpacing.s),
+                  filterWidget,
+                ],
+              )
+            : Row(
+                children: [
+                  titleWidget,
+                  const Spacer(),
+                  filterWidget,
+                ],
               ),
-            ),
-          ],
-        ),
         const SizedBox(height: CRMSpacing.m),
         Expanded(
           child: Builder(

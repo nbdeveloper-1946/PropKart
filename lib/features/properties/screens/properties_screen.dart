@@ -570,8 +570,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     emptyDescription:
                         'No records match your active search terms.',
                     showCheckboxColumn: false,
-                    dataRowMinHeight: 56.0,
-                    dataRowMaxHeight: 64.0,
+                    dataRowMinHeight: 72.0,
+                    dataRowMaxHeight: 80.0,
                     columns: [
                       const DataColumn(label: Text('Code')),
                       const DataColumn(label: Text('Property Name')),
@@ -745,28 +745,31 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                           .withValues(alpha: 0.3),
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        p.statusDisplayName,
-                                        style: TextStyle(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          p.statusDisplayName,
+                                          style: TextStyle(
+                                            color: p.isStatusAvailable
+                                                ? CRMColors.success
+                                                : CRMColors.warning,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          Icons.arrow_drop_down_rounded,
+                                          size: 16,
                                           color: p.isStatusAvailable
                                               ? CRMColors.success
                                               : CRMColors.warning,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
                                         ),
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Icon(
-                                        Icons.arrow_drop_down_rounded,
-                                        size: 16,
-                                        color: p.isStatusAvailable
-                                            ? CRMColors.success
-                                            : CRMColors.warning,
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1107,6 +1110,26 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   spacing: CRMSpacing.m,
                   runSpacing: CRMSpacing.m,
                   children: [
+                    // Rent vs Sale/Re-Sale Toggle Tabs
+                    Container(
+                      height: 48,
+                      width: targetWidth,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: CRMColors.backgroundOf(context),
+                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                              child: _buildPropertyListingTabButton('Rent')),
+                          const SizedBox(width: 4),
+                          Expanded(
+                              child: _buildPropertyListingTabButton('Re-Sale')),
+                        ],
+                      ),
+                    ),
                     _buildDropdown(
                       label: 'Category',
                       value: _selectedCategory,
@@ -1138,26 +1161,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                         _loadProperties();
                       },
                       width: targetWidth,
-                    ),
-                    // Rent vs Sale/Re-Sale Toggle Tabs
-                    Container(
-                      height: 48,
-                      width: targetWidth,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: CRMColors.backgroundOf(context),
-                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                              child: _buildPropertyListingTabButton('Rent')),
-                          const SizedBox(width: 4),
-                          Expanded(
-                              child: _buildPropertyListingTabButton('Re-Sale')),
-                        ],
-                      ),
                     ),
                     _buildVerificationDropdown(targetWidth),
                     SizedBox(

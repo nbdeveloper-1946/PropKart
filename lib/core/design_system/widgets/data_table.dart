@@ -16,6 +16,7 @@ class CRMDataTable extends StatelessWidget {
   final bool showCheckboxColumn;
   final double? dataRowMinHeight;
   final double? dataRowMaxHeight;
+  final bool showDecoration;
 
   const CRMDataTable({
     super.key,
@@ -28,6 +29,7 @@ class CRMDataTable extends StatelessWidget {
     this.showCheckboxColumn = true,
     this.dataRowMinHeight,
     this.dataRowMaxHeight,
+    this.showDecoration = true,
   });
 
   @override
@@ -53,13 +55,15 @@ class CRMDataTable extends StatelessWidget {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: CRMColors.cardBgOf(context),
-        borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.55), width: 0.5),
-        boxShadow: CRMShadows.soft,
-      ),
-      clipBehavior: Clip.antiAlias,
+      decoration: showDecoration
+          ? BoxDecoration(
+              color: CRMColors.cardBgOf(context),
+              borderRadius: BorderRadius.circular(CRMBorderRadius.card),
+              border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.55), width: 0.5),
+              boxShadow: CRMShadows.soft,
+            )
+          : null,
+      clipBehavior: showDecoration ? Clip.antiAlias : Clip.none,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final double availableWidth = constraints.maxWidth;
@@ -70,7 +74,6 @@ class CRMDataTable extends StatelessWidget {
           if (colCount > 1 && availableWidth > baseContentWidth) {
             spacing = (availableWidth - baseContentWidth) / (colCount - 1);
             if (spacing < CRMSpacing.s) spacing = CRMSpacing.s;
-            if (spacing > 40.0) spacing = 40.0;
           }
 
           return SingleChildScrollView(

@@ -2676,6 +2676,88 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
   }
 
   Widget _buildWizardActions(bool isEdit) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 500;
+
+    final cancelButton = CRMButton(
+      label: 'Cancel',
+      variant: CRMButtonVariant.outline,
+      onPressed: () => Navigator.pop(context),
+    );
+
+    final backButton = _currentStep > 0
+        ? CRMButton(
+            label: 'Back',
+            variant: CRMButtonVariant.secondary,
+            onPressed: () => setState(() => _currentStep--),
+          )
+        : null;
+
+    final nextButton = _currentStep < 3
+        ? CRMButton(
+            label: 'Next Step',
+            variant: CRMButtonVariant.primary,
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                setState(() => _currentStep++);
+              }
+            },
+          )
+        : CRMButton(
+            label: isEdit ? 'Save Changes' : 'Publish Property',
+            variant: CRMButtonVariant.primary,
+            onPressed: _submitForm,
+          );
+
+    final saveChangesButton = (isEdit && _currentStep < 3)
+        ? CRMButton(
+            label: 'Save Changes',
+            variant: CRMButtonVariant.outline,
+            onPressed: _submitForm,
+          )
+        : null;
+
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.all(CRMSpacing.m),
+        decoration: BoxDecoration(
+          color: CRMColors.cardBgOf(context),
+          border: Border(top: BorderSide(color: CRMColors.borderOf(context).withOpacity(0.5), width: 0.5)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                cancelButton,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (backButton != null) ...[
+                      backButton,
+                      const SizedBox(width: CRMSpacing.s),
+                    ],
+                    nextButton,
+                  ],
+                ),
+              ],
+            ),
+            if (saveChangesButton != null) ...[
+              const SizedBox(height: CRMSpacing.s),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  saveChangesButton,
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(CRMSpacing.m),
       decoration: BoxDecoration(
@@ -2685,45 +2767,18 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          CRMButton(
-            label: 'Cancel',
-            variant: CRMButtonVariant.outline,
-            onPressed: () => Navigator.pop(context),
-          ),
+          cancelButton,
           Row(
             children: [
-              if (_currentStep > 0) ...[
-                CRMButton(
-                  label: 'Back',
-                  variant: CRMButtonVariant.secondary,
-                  onPressed: () => setState(() => _currentStep--),
-                ),
+              if (backButton != null) ...[
+                backButton,
                 const SizedBox(width: CRMSpacing.s),
               ],
-              if (_currentStep < 3) ...[
-                if (isEdit) ...[
-                  CRMButton(
-                    label: 'Save Changes',
-                    variant: CRMButtonVariant.outline,
-                    onPressed: _submitForm,
-                  ),
-                  const SizedBox(width: CRMSpacing.s),
-                ],
-                CRMButton(
-                  label: 'Next Step',
-                  variant: CRMButtonVariant.primary,
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      setState(() => _currentStep++);
-                    }
-                  },
-                ),
-              ] else
-                CRMButton(
-                  label: isEdit ? 'Save Changes' : 'Publish Property',
-                  variant: CRMButtonVariant.primary,
-                  onPressed: _submitForm,
-                ),
+              if (saveChangesButton != null) ...[
+                saveChangesButton,
+                const SizedBox(width: CRMSpacing.s),
+              ],
+              nextButton,
             ],
           ),
         ],

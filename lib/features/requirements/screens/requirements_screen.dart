@@ -50,7 +50,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   String _activeMainTab = "Requirements"; // "Requirements" or "Follow-ups"
   DateTime? _reqFollowupDateFilter = DateTime.now();
   int _currentPage = 1;
-  static const int _requirementsPerPage = 5;
+  int _requirementsPerPage = 10;
+  int _currentFollowupPage = 1;
+  int _followupsPerPage = 10;
   final PropertiesRepository _propertiesRepository = PropertiesRepository();
   PropertyMetadataModel? _metadata;
   bool _isLoadingMetadata = true;
@@ -1097,40 +1099,8 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                     );
                   }).toList(),
                 ),
-                if (totalPages > 1) ...[
-                  const SizedBox(height: CRMSpacing.m),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Page $currentPage of $totalPages ($totalCount requirements)',
-                        style: CRMTypography.caption.copyWith(color: CRMColors.textSecondary),
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                            onPressed: currentPage > 1
-                                ? () => setState(() => _currentPage--)
-                                : null,
-                            tooltip: 'Previous Page',
-                          ),
-                          Text(
-                            '$currentPage / $totalPages',
-                            style: CRMTypography.captionBold.copyWith(color: CRMColors.text),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                            onPressed: currentPage < totalPages
-                                ? () => setState(() => _currentPage++)
-                                : null,
-                            tooltip: 'Next Page',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                const SizedBox(height: CRMSpacing.m),
+                _buildPagination(totalCount, totalPages, currentPage),
               ],
             );
           },
@@ -1139,7 +1109,149 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     );
   }
 
-    Widget _buildRequirementCards(
+  Widget _buildPagination(int totalItems, int totalPages, int currentPage) {
+    final from = totalItems == 0 ? 0 : (currentPage - 1) * _requirementsPerPage + 1;
+    final to = (currentPage * _requirementsPerPage).clamp(0, totalItems);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 500;
+
+    final infoText = Text(
+      'Showing $from–$to of $totalItems',
+      style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+    );
+
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows:',
+            style:
+                CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
+        const SizedBox(width: CRMSpacing.xs),
+        DropdownButton<int>(
+          value: _requirementsPerPage,
+          underline: const SizedBox.shrink(),
+          items: const [
+            DropdownMenuItem(value: 10, child: Text('10')),
+            DropdownMenuItem(value: 25, child: Text('25')),
+            DropdownMenuItem(value: 50, child: Text('50')),
+          ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() {
+              _requirementsPerPage = val;
+              _currentPage = 1;
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed:
+              currentPage > 1 ? () => setState(() => _currentPage--) : null,
+        ),
+        Text(
+          '$currentPage / $totalPages',
+          style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: currentPage < totalPages
+              ? () => setState(() => _currentPage++)
+              : null,
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          infoText,
+          const SizedBox(height: CRMSpacing.s),
+          controls,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        infoText,
+        controls,
+      ],
+    );
+  }
+
+  Widget _buildFollowupsPagination(int totalItems, int totalPages, int currentPage) {
+    final from = totalItems == 0 ? 0 : (currentPage - 1) * _followupsPerPage + 1;
+    final to = (currentPage * _followupsPerPage).clamp(0, totalItems);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 500;
+
+    final infoText = Text(
+      'Showing $from–$to of $totalItems',
+      style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+    );
+
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows:',
+            style:
+                CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
+        const SizedBox(width: CRMSpacing.xs),
+        DropdownButton<int>(
+          value: _followupsPerPage,
+          underline: const SizedBox.shrink(),
+          items: const [
+            DropdownMenuItem(value: 10, child: Text('10')),
+            DropdownMenuItem(value: 25, child: Text('25')),
+            DropdownMenuItem(value: 50, child: Text('50')),
+          ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() {
+              _followupsPerPage = val;
+              _currentFollowupPage = 1;
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed:
+              currentPage > 1 ? () => setState(() => _currentFollowupPage--) : null,
+        ),
+        Text(
+          '$currentPage / $totalPages',
+          style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: currentPage < totalPages
+              ? () => setState(() => _currentFollowupPage++)
+              : null,
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          infoText,
+          const SizedBox(height: CRMSpacing.s),
+          controls,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        infoText,
+        controls,
+      ],
+    );
+  }
+
+  Widget _buildRequirementCards(
     List<RequirementModel> requirements,
     bool isLoading,
     UserModel? currentUser,
@@ -1466,61 +1578,37 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             ),
           );
         }),
-        if (totalPages > 1) ...[
-          const SizedBox(height: CRMSpacing.s),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Page $currentPage of $totalPages',
-                style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                    onPressed: currentPage > 1
-                        ? () => setState(() => _currentPage--)
-                        : null,
-                  ),
-                  Text(
-                    '$currentPage / $totalPages',
-                    style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                    onPressed: currentPage < totalPages
-                        ? () => setState(() => _currentPage++)
-                        : null,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
+        const SizedBox(height: CRMSpacing.s),
+        _buildPagination(totalCount, totalPages, currentPage),
       ],
     );
   }
 
   Widget _buildDetailChip(IconData icon, String label, String value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: CRMColors.textMuted),
-        const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: CRMTypography.caption.copyWith(color: CRMColors.textMuted, fontSize: 10)),
-            Text(
-              value,
-              style: CRMTypography.captionBold.copyWith(color: CRMColors.text),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 160),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: CRMColors.textMuted),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, style: CRMTypography.caption.copyWith(color: CRMColors.textMuted, fontSize: 10)),
+                Text(
+                  value,
+                  style: CRMTypography.captionBold.copyWith(color: CRMColors.text),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1614,6 +1702,28 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 parsed.day == _reqFollowupDateFilter!.day;
           }).toList();
 
+          final totalCount = filtered.length;
+          final totalPages = (totalCount / _followupsPerPage).ceil();
+          final currentPage = _currentFollowupPage.clamp(1, totalPages > 0 ? totalPages : 1);
+
+          final startIndex = (currentPage - 1) * _followupsPerPage;
+          final endIndex = (startIndex + _followupsPerPage).clamp(0, totalCount);
+
+          final pageItems = (startIndex < totalCount)
+              ? filtered.sublist(startIndex, endIndex)
+              : <DashboardFollowup>[];
+
+          if (pageItems.isEmpty && currentPage > 1) {
+            // Safe fall-back if page boundaries changed
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _currentFollowupPage = 1;
+                });
+              }
+            });
+          }
+
           if (filtered.isEmpty) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 32),
@@ -1626,31 +1736,39 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             );
           }
 
-          return CRMDataTable(
-            columns: const [
-              DataColumn(label: Text('Client Name')),
-              DataColumn(label: Text('Mobile')),
-              DataColumn(label: Text('Scheduled Date')),
-              DataColumn(label: Text('Remarks / Agenda')),
-            ],
-            rows: filtered.map((f) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(f.clientName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                  DataCell(Text(f.mobile)),
-                  DataCell(Builder(
-                    builder: (_) {
-                      final parsed = DateTime.tryParse(f.followupDate);
-                      final displayDate = parsed != null
-                          ? DateFormat('dd/MM/yyyy hh:mm a').format(parsed)
-                          : f.followupDate;
-                      return Text(displayDate, style: TextStyle(color: CRMColors.primary, fontWeight: FontWeight.w600));
-                    },
-                  )),
-                  DataCell(Text(f.notes ?? '-')),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CRMDataTable(
+                showDecoration: false,
+                columns: const [
+                  DataColumn(label: Text('Client Name')),
+                  DataColumn(label: Text('Mobile')),
+                  DataColumn(label: Text('Scheduled Date')),
+                  DataColumn(label: Text('Remarks / Agenda')),
                 ],
-              );
-            }).toList(),
+                rows: pageItems.map((f) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(f.clientName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(f.mobile)),
+                      DataCell(Builder(
+                        builder: (_) {
+                          final parsed = DateTime.tryParse(f.followupDate);
+                          final displayDate = parsed != null
+                              ? DateFormat('dd/MM/yyyy hh:mm a').format(parsed)
+                              : f.followupDate;
+                          return Text(displayDate, style: TextStyle(color: CRMColors.primary, fontWeight: FontWeight.w600));
+                        },
+                      )),
+                      DataCell(Text(f.notes ?? '-')),
+                    ],
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: CRMSpacing.m),
+              _buildFollowupsPagination(totalCount, totalPages, currentPage),
+            ],
           );
         },
       ),
@@ -2029,9 +2147,11 @@ class _RequirementStepperDialogState extends State<RequirementStepperDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    widget.isSiteVisit ? 'Update Requirement & Add Site Visit' : 'Update Requirement & Add Followup',
-                    style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+                  Expanded(
+                    child: Text(
+                      widget.isSiteVisit ? 'Update Requirement & Add Site Visit' : 'Update Requirement & Add Followup',
+                      style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),

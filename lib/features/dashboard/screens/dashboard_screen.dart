@@ -42,6 +42,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime _selectedFollowupDate = DateTime.now();
   String _activeFollowupSection = 'Follow-ups'; // 'Follow-ups' or 'Schedule'
 
+  int _notePage = 1;
+  static const int _notesPerPage = 5;
+
   @override
   void initState() {
     super.initState();
@@ -107,11 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildWelcomeHeader(userEmail, dateString, greeting),
                   const SizedBox(height: CRMSpacing.l),
 
-                  // 2. Property Metrics (Total Properties removed)
-                  _buildKPIGrids(data.summary),
-                  const SizedBox(height: CRMSpacing.l),
-
-                  // 3. Responsive Main Content Area
+                  // 2. Responsive Main Content Area
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final isDesktop = constraints.maxWidth >= 900;
@@ -123,6 +122,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               flex: 3,
                               child: Column(
                                 children: [
+                                  _buildKPIGrids(data.summary, isDesktop: true),
+                                  const SizedBox(height: CRMSpacing.l),
                                   _buildStatusPieChart(data.summary),
                                   const SizedBox(height: CRMSpacing.l),
                                   _buildRecentProperties(data.recentProperties),
@@ -134,6 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               flex: 2,
                               child: Column(
                                 children: [
+                                  const SizedBox(height: 54),
                                   _buildTodayWork(data.checklist),
                                   const SizedBox(height: CRMSpacing.l),
                                   _buildFollowups(data.followups, data.siteVisits),
@@ -145,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       } else {
                         return Column(
                           children: [
+                            _buildKPIGrids(data.summary, isDesktop: false),
+                            const SizedBox(height: CRMSpacing.l),
                             _buildStatusPieChart(data.summary),
                             const SizedBox(height: CRMSpacing.l),
                             _buildRecentProperties(data.recentProperties),
@@ -237,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return 'Other';
   }
 
-  Widget _buildKPIGrids(DashboardSummary summary) {
+  Widget _buildKPIGrids(DashboardSummary summary, {required bool isDesktop}) {
     final double screenWidth = MediaQuery.of(context).size.width;
 
     final int availableVal = _activeTab == 'Rental' ? summary.rentalAvailable : summary.resaleAvailable;
@@ -277,8 +281,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     ];
 
-    final int crossAxisCount = screenWidth >= 1000 ? cards.length : 2;
-    final double childAspectRatio = screenWidth >= 1000 ? (cards.length == 4 ? 2.2 : 2.5) : 1.5;
+    final int crossAxisCount = isDesktop ? 2 : (screenWidth >= 600 ? cards.length : 2);
+    final double childAspectRatio = isDesktop ? 2.4 : (screenWidth >= 600 ? 2.5 : 1.5);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,7 +352,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: AnimatedContainer(
         duration: CRMMotion.tabSwitch,
         curve: CRMMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.xs),
+        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? CRMColors.primary.withOpacity(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
@@ -1034,6 +1039,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTodayWork(List<ChecklistItem> items) {
+    final totalCount = items.length;
+    final totalPages = (totalCount / _notesPerPage).ceil();
+    final currentPage = _notePage.clamp(1, totalPages > 0 ? totalPages : 1);
+
+    final startIndex = (currentPage - 1) * _notesPerPage;
+    final endIndex = (startIndex + _notesPerPage).clamp(0, totalCount);
+
+    final pageItems = (startIndex < totalCount)
+        ? items.sublist(startIndex, endIndex)
+        : <ChecklistItem>[];
+
     return CRMCard(
       elevated: true,
       title: "Note's",
@@ -1053,7 +1069,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               )
             : Column(
-                children: items.map((item) => _buildTaskTile(item)).toList(),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ...pageItems.map((item) => _buildTaskTile(item)),
+                  if (totalPages > 1) ...[
+                    const SizedBox(height: CRMSpacing.m),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Page $currentPage of $totalPages ($totalCount notes)',
+                          style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              onPressed: currentPage > 1
+                                  ? () => setState(() => _notePage--)
+                                  : null,
+                              tooltip: 'Previous Page',
+                            ),
+                            Text(
+                              '$currentPage / $totalPages',
+                              style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                              onPressed: currentPage < totalPages
+                                  ? () => setState(() => _notePage++)
+                                  : null,
+                              tooltip: 'Next Page',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
       ),
     );
@@ -1157,6 +1210,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildBigFollowupTabSwitcher() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(CRMSpacing.xxs),
+      decoration: BoxDecoration(
+        color: CRMColors.backgroundOf(context),
+        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildBigFollowupTabButton('Follow-ups'),
+          ),
+          const SizedBox(width: CRMSpacing.xxs),
+          Expanded(
+            child: _buildBigFollowupTabButton('Site Visits'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBigFollowupTabButton(String label) {
+    final isSelected = _activeFollowupSection == label;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _activeFollowupSection = label;
+        _followupPage = 1;
+      }),
+      child: AnimatedContainer(
+        duration: CRMMotion.tabSwitch,
+        curve: CRMMotion.easeOut,
+        decoration: BoxDecoration(
+          color: isSelected ? CRMColors.primary.withOpacity(0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+          border: isSelected
+              ? Border.all(color: CRMColors.primary.withOpacity(0.3), width: 0.5)
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: CRMTypography.bodyMedium.copyWith(
+            color: isSelected ? CRMColors.primary : CRMColors.textSecondaryOf(context),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFollowups(List<DashboardFollowup> followups, List<DashboardSiteVisit> siteVisits) {
     // 1. Filter followups by _selectedFollowupDate (default today)
     final filteredFollowups = followups.where((f) {
@@ -1210,53 +1315,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
-    final Widget actionButtons = Row(
+    final Widget dateSelection = Row(
       mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          height: 32,
-          padding: const EdgeInsets.all(CRMSpacing.xxs),
-          decoration: BoxDecoration(
-            color: CRMColors.backgroundOf(context),
-            borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-            border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildFollowupTabChip('Follow-ups'),
-              const SizedBox(width: CRMSpacing.xxs),
-              _buildFollowupTabChip('Site Visits'),
-            ],
-          ),
+        Text(
+          dateStr,
+          style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              dateStr,
-              style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
-            ),
-            IconButton(
-              icon: Icon(Icons.calendar_today_rounded, color: CRMColors.primary, size: 18),
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedFollowupDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2030),
-                );
-                if (picked != null) {
-                  setState(() {
-                    _selectedFollowupDate = picked;
-                    _followupPage = 1;
-                  });
-                }
-              },
-              tooltip: 'Filter by Date',
-            ),
-          ],
+        IconButton(
+          icon: Icon(Icons.calendar_today_rounded, color: CRMColors.primary, size: 18),
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _selectedFollowupDate,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2030),
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedFollowupDate = picked;
+                _followupPage = 1;
+              });
+            }
+          },
+          tooltip: 'Filter by Date',
         ),
       ],
     );
@@ -1267,102 +1349,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
       subtitle: isSiteVisitsTab
           ? 'Scheduled property site visits and client meetings'
           : 'Schedule of communications and client appointments',
-      headerAction: isMobile ? null : actionButtons,
+      headerAction: isMobile ? null : dateSelection,
       child: Padding(
         padding: const EdgeInsets.only(top: CRMSpacing.m),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _buildBigFollowupTabSwitcher(),
+            const SizedBox(height: CRMSpacing.m),
             if (isMobile) ...[
-              actionButtons,
-              const SizedBox(height: CRMSpacing.m),
+              Align(
+                alignment: Alignment.centerRight,
+                child: dateSelection,
+              ),
+              const SizedBox(height: CRMSpacing.s),
             ],
-
-            pageItems.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        isSiteVisitsTab ? 'No scheduled site visits for $dateStr.' : 'No follow-ups for $dateStr.',
-                        style: TextStyle(color: CRMColors.textSecondaryOf(context)),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      ...pageItems.map((item) {
-                        if (isSiteVisitsTab) {
-                          return _buildSiteVisitTile(item as DashboardSiteVisit);
-                        } else {
-                          return _buildFollowupTile(item as DashboardFollowup);
-                        }
-                      }),
-                      if (totalPages > 1) ...[
-                        const SizedBox(height: CRMSpacing.m),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Page $currentPage of $totalPages ($totalCount total)',
-                              style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
-                            ),
+                pageItems.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            isSiteVisitsTab ? 'No scheduled site visits for $dateStr.' : 'No follow-ups for $dateStr.',
+                            style: TextStyle(color: CRMColors.textSecondaryOf(context)),
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          ...pageItems.map((item) {
+                            if (isSiteVisitsTab) {
+                              return _buildSiteVisitTile(item as DashboardSiteVisit);
+                            } else {
+                              return _buildFollowupTile(item as DashboardFollowup);
+                            }
+                          }),
+                          if (totalPages > 1) ...[
+                            const SizedBox(height: CRMSpacing.m),
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                                  onPressed: currentPage > 1
-                                      ? () => setState(() => _followupPage--)
-                                      : null,
-                                  tooltip: 'Previous Page',
-                                ),
                                 Text(
-                                  '$currentPage / $totalPages',
-                                  style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+                                  'Page $currentPage of $totalPages ($totalCount total)',
+                                  style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                                  onPressed: currentPage < totalPages
-                                      ? () => setState(() => _followupPage++)
-                                      : null,
-                                  tooltip: 'Next Page',
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                                      onPressed: currentPage > 1
+                                          ? () => setState(() => _followupPage--)
+                                          : null,
+                                      tooltip: 'Previous Page',
+                                    ),
+                                    Text(
+                                      '$currentPage / $totalPages',
+                                      style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                                      onPressed: currentPage < totalPages
+                                          ? () => setState(() => _followupPage++)
+                                          : null,
+                                      tooltip: 'Next Page',
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ],
-                        ),
-                      ],
-                    ],
-                  ),
+                        ],
+                      ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFollowupTabChip(String label) {
-    final isSelected = _activeFollowupSection == label;
-    return GestureDetector(
-      onTap: () => setState(() {
-        _activeFollowupSection = label;
-        _followupPage = 1;
-      }),
-      child: AnimatedContainer(
-        duration: CRMMotion.tabSwitch,
-        curve: CRMMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xxs),
-        decoration: BoxDecoration(
-          color: isSelected ? CRMColors.primary.withOpacity(0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
-          border: isSelected
-              ? Border.all(color: CRMColors.primary.withOpacity(0.3), width: 0.5)
-              : null,
-        ),
-        child: Text(
-          label,
-          style: CRMTypography.captionBold.copyWith(
-            color: isSelected ? CRMColors.primary : CRMColors.textSecondaryOf(context),
-            fontSize: 12,
-          ),
         ),
       ),
     );
