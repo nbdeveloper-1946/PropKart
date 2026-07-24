@@ -1,0 +1,589 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/design_system/tokens/app_colors.dart';
+import '../../../core/design_system/tokens/app_spacing.dart';
+import '../../../core/design_system/tokens/app_typography.dart';
+import '../../../core/design_system/widgets/buttons.dart';
+import '../../../core/design_system/widgets/cards.dart';
+import '../../../core/design_system/widgets/data_table.dart';
+import '../../../core/utils/currency.dart';
+import '../models/property_model.dart';
+import '../services/properties_service.dart';
+import '../../requirements/models/requirement_model.dart';
+import '../../requirements/services/requirements_service.dart';
+
+class RecycleBinScreen extends StatefulWidget {
+  const RecycleBinScreen({super.key});
+
+  @override
+  State<RecycleBinScreen> createState() => _RecycleBinScreenState();
+}
+
+class _RecycleBinScreenState extends State<RecycleBinScreen> {
+  final PropertiesService _propertiesService = PropertiesService();
+  final RequirementsService _requirementsService = RequirementsService();
+
+  bool _isLoading = true;
+  String _selectedTab = 'Properties'; // 'Properties' or 'Requirements'
+  int _autoDeleteDays = 30; // 15, 30, 60
+
+  List<PropertyModel> _binProperties = [];
+  List<RequirementModel> _binRequirements = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAutoDeleteDays();
+    _fetchBinData();
+  }
+
+  Future<void> _loadAutoDeleteDays() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _autoDeleteDays = prefs.getInt('auto_delete_days') ?? 30;
+    });
+  }
+
+  Future<void> _saveAutoDeleteDays(int days) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('auto_delete_days', days);
+    setState(() {
+      _autoDeleteDays = days;
+    });
+  }
+
+  Future<void> _fetchBinData() async {
+    if (_selectedTab == 'Properties') {
+      await _fetchBinProperties();
+    } else {
+      await _fetchBinRequirements();
+    }
+  }
+
+  Future<void> _fetchBinProperties() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await _propertiesService.getBinProperties();
+      final data = res['data'] as Map<String, dynamic>? ?? {};
+      final list = data['properties'] as List? ?? [];
+      setState(() {
+        _binProperties = list.map((p) => PropertyModel.fromJson(p)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load bin properties: $e'), backgroundColor: CRMColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchBinRequirements() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await _requirementsService.getBinRequirements();
+      final data = res['data'] as Map<String, dynamic>? ?? {};
+      final list = data['requirements'] as List? ?? [];
+      setState(() {
+        _binRequirements = list.map((r) => RequirementModel.fromJson(r)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load bin requirements: $e'), backgroundColor: CRMColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreProperty(String id) async {
+    try {
+      await _propertiesService.restoreProperty(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Property restored successfully'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinProperties();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to restore property: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _restoreRequirement(String id) async {
+    try {
+      await _requirementsService.restoreRequirement(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Requirement restored successfully'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinRequirements();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to restore requirement: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _permanentDeleteProperty(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Permanently Delete Property'),
+        content: const Text('Are you sure? This action cannot be undone and will erase this property forever.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete Permanently', style: TextStyle(color: CRMColors.danger))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _propertiesService.permanentDeleteProperty(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Property permanently deleted'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinProperties();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete property: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _permanentDeleteRequirement(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Permanently Delete Requirement'),
+        content: const Text('Are you sure? This action cannot be undone and will erase this requirement forever.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete Permanently', style: TextStyle(color: CRMColors.danger))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _requirementsService.permanentDeleteRequirement(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Requirement permanently deleted'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinRequirements();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete requirement: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _emptyBinProperties() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Empty Recycle Bin (Properties)'),
+        content: const Text('Are you sure you want to permanently erase ALL deleted properties in the bin?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Empty Bin', style: TextStyle(color: CRMColors.danger))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _propertiesService.emptyBin();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Properties recycle bin emptied'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinProperties();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to empty bin: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _emptyBinRequirements() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Empty Recycle Bin (Requirements)'),
+        content: const Text('Are you sure you want to permanently erase ALL deleted requirements in the bin?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Empty Bin', style: TextStyle(color: CRMColors.danger))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _requirementsService.emptyBin();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Requirements recycle bin emptied'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinRequirements();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to empty bin: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasData = _selectedTab == 'Properties' 
+        ? _binProperties.isNotEmpty 
+        : _binRequirements.isNotEmpty;
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
+
+    Widget headerControls = Wrap(
+      spacing: CRMSpacing.s,
+      runSpacing: CRMSpacing.s,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: CRMColors.cardBgOf(context),
+            borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+            border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _autoDeleteDays,
+              icon: const Icon(Icons.arrow_drop_down),
+              style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
+              dropdownColor: CRMColors.cardBgOf(context),
+              onChanged: (int? newValue) {
+                if (newValue != null) {
+                  _saveAutoDeleteDays(newValue);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Auto-delete period set to $newValue days'),
+                      backgroundColor: CRMColors.success,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              items: const [
+                DropdownMenuItem<int>(
+                  value: 15,
+                  child: Text('Auto Delete: 15 days'),
+                ),
+                DropdownMenuItem<int>(
+                  value: 30,
+                  child: Text('Auto Delete: 30 days'),
+                ),
+                DropdownMenuItem<int>(
+                  value: 60,
+                  child: Text('Auto Delete: 60 days'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (hasData)
+          CRMButton(
+            label: 'Empty Bin',
+            variant: CRMButtonVariant.danger,
+            prefixIcon: Icons.delete_forever_rounded,
+            onPressed: _selectedTab == 'Properties' ? _emptyBinProperties : _emptyBinRequirements,
+          ),
+      ],
+    );
+
+    Widget pageHeader = isMobile
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Recycle Bin', style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context))),
+              const SizedBox(height: 4),
+              Text(
+                _selectedTab == 'Properties' ? 'Deleted Properties' : 'Deleted Requirements',
+                style: CRMTypography.pageTitle.copyWith(
+                  color: CRMColors.textOf(context),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: CRMSpacing.s),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Properties'),
+                    selected: _selectedTab == 'Properties',
+                    selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: _selectedTab == 'Properties' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                      fontWeight: _selectedTab == 'Properties' ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedTab = 'Properties';
+                        });
+                        _fetchBinData();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: CRMSpacing.s),
+                  ChoiceChip(
+                    label: const Text('Requirements'),
+                    selected: _selectedTab == 'Requirements',
+                    selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: _selectedTab == 'Requirements' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                      fontWeight: _selectedTab == 'Requirements' ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedTab = 'Requirements';
+                        });
+                        _fetchBinData();
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: CRMSpacing.m),
+              headerControls,
+            ],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Recycle Bin', style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context))),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: CRMSpacing.m,
+                      runSpacing: CRMSpacing.s,
+                      children: [
+                        Text(
+                          _selectedTab == 'Properties' ? 'Deleted Properties' : 'Deleted Requirements',
+                          style: CRMTypography.pageTitle.copyWith(
+                            color: CRMColors.textOf(context),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Properties'),
+                          selected: _selectedTab == 'Properties',
+                          selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                          labelStyle: TextStyle(
+                            color: _selectedTab == 'Properties' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                            fontWeight: _selectedTab == 'Properties' ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedTab = 'Properties';
+                              });
+                              _fetchBinData();
+                            }
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Requirements'),
+                          selected: _selectedTab == 'Requirements',
+                          selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                          labelStyle: TextStyle(
+                            color: _selectedTab == 'Requirements' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                            fontWeight: _selectedTab == 'Requirements' ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedTab = 'Requirements';
+                              });
+                              _fetchBinData();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              headerControls,
+            ],
+          );
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? CRMSpacing.m : CRMSpacing.l),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            pageHeader,
+            const SizedBox(height: CRMSpacing.l),
+            CRMCard(
+              child: _isLoading
+                  ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  : _selectedTab == 'Properties'
+                      ? _binProperties.isEmpty
+                          ? _buildEmptyState('Properties deleted from active listings will appear here.')
+                          : CRMDataTable(
+                              isLoading: false,
+                              showCheckboxColumn: false,
+                              dataRowMinHeight: 56.0,
+                              dataRowMaxHeight: 64.0,
+                              columns: const [
+                                DataColumn(label: Text('Code')),
+                                DataColumn(label: Text('Property Name')),
+                                DataColumn(label: Text('Owner')),
+                                DataColumn(label: Text('Area')),
+                                DataColumn(label: Text('Price')),
+                                DataColumn(label: Text('Actions')),
+                              ],
+                              rows: _binProperties.map((p) {
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text(p.propertyCode, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                    DataCell(Text(p.title)),
+                                    DataCell(Text(p.ownerName)),
+                                    DataCell(Text(p.areaName)),
+                                    DataCell(Text(CRMCurrencyFormatter.formatShort(p.price), style: const TextStyle(fontWeight: FontWeight.w600))),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
+                                            tooltip: 'Restore Property',
+                                            onPressed: () => _restoreProperty(p.id),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                            tooltip: 'Permanently Delete',
+                                            onPressed: () => _permanentDeleteProperty(p.id),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            )
+                      : _binRequirements.isEmpty
+                          ? _buildEmptyState('Requirements deleted from active pipeline will appear here.')
+                          : CRMDataTable(
+                              isLoading: false,
+                              showCheckboxColumn: false,
+                              dataRowMinHeight: 56.0,
+                              dataRowMaxHeight: 64.0,
+                              columns: const [
+                                DataColumn(label: Text('Client Name')),
+                                DataColumn(label: Text('Specs / Config')),
+                                DataColumn(label: Text('Budget Range')),
+                                DataColumn(label: Text('Target Area(s)')),
+                                DataColumn(label: Text('Actions')),
+                              ],
+                              rows: _binRequirements.map((r) {
+                                final budgetRange = '${CRMCurrencyFormatter.formatShort(r.minBudget)} - ${CRMCurrencyFormatter.formatShort(r.maxBudget)}';
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(r.clientName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Text(r.clientMobile, style: TextStyle(color: CRMColors.textMutedOf(context), fontSize: 11)),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(Text('${r.propertyTypeName} (${r.configurationName ?? "-"})')),
+                                    DataCell(Text(budgetRange, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 160,
+                                        child: Tooltip(
+                                          message: r.areaNames.join(', '),
+                                          child: Text(
+                                            r.areaNames.join(', '),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(color: CRMColors.textSecondaryOf(context), fontSize: 13),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
+                                            tooltip: 'Restore Requirement',
+                                            onPressed: () => _restoreRequirement(r.id),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                            tooltip: 'Permanently Delete',
+                                            onPressed: () => _permanentDeleteRequirement(r.id),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String description) {
+    return Padding(
+      padding: const EdgeInsets.all(48.0),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_sweep_outlined, size: 64, color: CRMColors.textSecondaryOf(context)),
+            const SizedBox(height: CRMSpacing.m),
+            Text(
+              'Recycle Bin is Empty',
+              style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+            ),
+            const SizedBox(height: CRMSpacing.xs),
+            Text(
+              description,
+              style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

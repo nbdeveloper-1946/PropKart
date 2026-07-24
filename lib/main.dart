@@ -1,121 +1,133 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'features/auth/bloc/auth_bloc.dart';
+import 'features/auth/repository/auth_repository.dart';
+import 'features/dashboard/repository/dashboard_repository.dart';
+import 'features/users/repository/users_repository.dart';
+import 'features/requirements/repository/requirements_repository.dart';
+import 'features/clients/repository/clients_repository.dart';
+import 'features/owners/repository/owners_repository.dart';
+import 'features/builders/repository/builders_repository.dart';
+import 'features/dashboard/bloc/dashboard_bloc.dart';
+import 'features/users/bloc/users_bloc.dart';
+import 'features/requirements/bloc/requirements_bloc.dart';
+import 'features/clients/bloc/clients_bloc.dart';
+import 'features/owners/bloc/owners_bloc.dart';
+import 'features/builders/bloc/builders_bloc.dart';
+import 'core/navigation/app_router.dart';
+import 'core/design_system/theme/propkart_theme.dart';
+import 'core/theme/theme_manager.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+import 'core/storage/isar_service.dart';
+import 'core/storage/performance_logger.dart';
+import 'core/network/sync_manager.dart';
+import 'core/storage/repository_coordinator.dart';
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+// ignore: depend_on_referenced_packages
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
+void main() async {
+  usePathUrlStrategy();
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await IsarService().initialize();
+    await PerformanceLogger().initialize();
+    await SyncManager().initialize();
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+    final lookupCount = await RepositoryCoordinator().lookupLocal.getLookupsCount();
+    if (lookupCount > 0) {
+      SyncManager().isSyncCompleted = true;
+    }
+  } catch (e) {
+    debugPrint("Error during startup initialization: $e");
   }
 
+  final authRepository = AuthRepository();
+
+  runApp(MyApp(authRepository: authRepository));
+}
+
+class MyApp extends StatefulWidget {
+  final AuthRepository authRepository;
+
+  const MyApp({super.key, required this.authRepository});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final AppRouter _appRouter;
+  late final AuthBloc _authBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _authBloc = AuthBloc(authRepository: widget.authRepository)..add(AuthCheckStatus());
+    _appRouter = AppRouter(_authBloc);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider.value(value: widget.authRepository),
+        RepositoryProvider(create: (context) => DashboardRepository()),
+        RepositoryProvider(create: (context) => UsersRepository()),
+        RepositoryProvider(create: (context) => RequirementsRepository()),
+        RepositoryProvider(create: (context) => ClientsRepository()),
+        RepositoryProvider(create: (context) => OwnersRepository()),
+        RepositoryProvider(create: (context) => BuildersRepository()),
+      ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: _authBloc),
+          BlocProvider(
+            create: (context) => DashboardBloc(
+              dashboardRepository: context.read<DashboardRepository>(),
             ),
-          ],
+          ),
+          BlocProvider(
+            create: (context) => UsersBloc(
+              usersRepository: context.read<UsersRepository>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => RequirementsBloc(
+              requirementsRepository: context.read<RequirementsRepository>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => ClientsBloc(
+              clientsRepository: context.read<ClientsRepository>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => OwnersBloc(
+              ownersRepository: context.read<OwnersRepository>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => BuildersBloc(
+              buildersRepository: context.read<BuildersRepository>(),
+            ),
+          ),
+        ],
+        child: ListenableBuilder(
+          listenable: ThemeManager(),
+          builder: (context, _) {
+            final isDark = ThemeManager().isDarkMode;
+            return MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              title: 'PropKart',
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              theme: PropKartTheme.light(),
+              darkTheme: PropKartTheme.dark(),
+              routerConfig: _appRouter.router,
+            );
+          },
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
