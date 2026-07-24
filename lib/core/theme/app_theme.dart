@@ -163,6 +163,7 @@ class PremiumTextField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final FormFieldValidator<String>? validator;
+  final Iterable<String>? autofillHints;
 
   const PremiumTextField({
     super.key,
@@ -173,6 +174,7 @@ class PremiumTextField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.validator,
+    this.autofillHints,
   });
 
   @override
@@ -181,6 +183,7 @@ class PremiumTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      autofillHints: autofillHints,
       style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
       decoration: InputDecoration(
         labelText: labelText,
