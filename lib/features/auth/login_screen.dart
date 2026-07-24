@@ -314,16 +314,21 @@ class _LoginScreenState extends State<LoginScreen> {
             // Brand Logo
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: CRMColors.primaryOf(context).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.cloud_queue_rounded,
-                    color: CRMColors.primaryOf(context),
-                    size: 28,
+                Image.asset(
+                  'assets/logo.png',
+                  width: 36,
+                  height: 36,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: CRMColors.primaryOf(context).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.apartment_rounded,
+                      color: CRMColors.primaryOf(context),
+                      size: 20,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

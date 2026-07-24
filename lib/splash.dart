@@ -31,6 +31,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   String _clientVersion = "1.0.0";
   String _loadingMessage = "Initializing system...";
   bool _showRetryButton = false;
+  late DateTime _startTime;
   
   final ConfigService _configService = ConfigService();
   final LegalService _legalService = LegalService();
@@ -38,6 +39,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    _startTime = DateTime.now();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -188,7 +190,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
+    if (!mounted) return;
+    await _ensureMinSplashDelay();
     if (!mounted) return;
     final from = GoRouterState.of(context).uri.queryParameters['from'];
     if (from != null && from.isNotEmpty) {
@@ -198,9 +202,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  void _navigateToGetStarted() {
+  Future<void> _navigateToGetStarted() async {
+    if (!mounted) return;
+    await _ensureMinSplashDelay();
     if (!mounted) return;
     context.go('/get-started');
+  }
+
+  Future<void> _ensureMinSplashDelay() async {
+    final elapsed = DateTime.now().difference(_startTime);
+    final minDuration = const Duration(milliseconds: 2200); // 2.2 seconds
+    if (elapsed < minDuration) {
+      await Future.delayed(minDuration - elapsed);
+    }
   }
 
   void _showMaintenanceDialog(String message) {

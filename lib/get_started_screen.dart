@@ -17,14 +17,47 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth >= 960) {
-            return _buildLaptopLayout(context, constraints);
-          } else {
-            return _buildMobileLayout(context, constraints);
-          }
-        },
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 960) {
+                return _buildLaptopLayout(context, constraints);
+              } else {
+                return _buildMobileLayout(context, constraints);
+              }
+            },
+          ),
+          Positioned(
+            top: 24,
+            left: 24,
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/logo.png',
+                  width: 32,
+                  height: 32,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.apartment_rounded,
+                    color: AppColors.brandGreen,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'PropKart',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
