@@ -9,7 +9,7 @@ class ThemeManager extends ChangeNotifier {
   static const _prefsKey = 'propkart_dark_mode';
 
   ThemeManager._internal() {
-    _isDarkMode = PlatformDispatcher.instance.platformBrightness == Brightness.dark;
+    _isDarkMode = false; // Default to Light Mode on first launch
     _loadPersisted();
   }
 

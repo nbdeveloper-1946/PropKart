@@ -295,8 +295,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final primaryColor = CRMColors.primaryOf(context);
+    final textColor = CRMColors.textOf(context);
+    final secondaryTextColor = CRMColors.textSecondaryOf(context);
+
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
+      backgroundColor: scaffoldBg,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -310,10 +315,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   'assets/logo.png',
                   width: 120,
                   height: 120,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
+                  errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.apartment_rounded,
                     size: 100,
-                    color: AppColors.brandGreen,
+                    color: primaryColor,
                   ),
                 ),
               ),
@@ -321,7 +326,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               Text(
                 'PropKart',
                 style: CRMTypography.largeDisplay.copyWith(
-                  color: Colors.white,
+                  color: textColor,
                   letterSpacing: 2,
                 ),
               ),
@@ -329,17 +334,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               Text(
                 'Version $_clientVersion',
                 style: CRMTypography.subheadline.copyWith(
-                  color: AppColors.textMuted,
+                  color: secondaryTextColor,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
               // Soft premium loader indicator
-              const SizedBox(
+              SizedBox(
                 width: 32,
                 height: 32,
                 child: CircularProgressIndicator(
-                  color: AppColors.brandGreen,
+                  color: primaryColor,
                   strokeWidth: 2,
                 ),
               ),
@@ -350,7 +355,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   _loadingMessage,
                   textAlign: TextAlign.center,
                   style: CRMTypography.body.copyWith(
-                    color: AppColors.textMuted,
+                    color: secondaryTextColor,
                     fontSize: 14,
                   ),
                 ),
@@ -359,7 +364,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 const SizedBox(height: AppSpacing.l),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.brandGreen,
+                    backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
