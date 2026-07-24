@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../../../modules/config/services/config_service.dart';
+import '../../../modules/version/presentation/update_dialogs.dart';
 import '../../../core/design_system/tokens/app_colors.dart';
 import '../../../core/design_system/tokens/app_spacing.dart';
 import '../../../core/design_system/tokens/app_typography.dart';
@@ -22,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final PropertiesService _propertiesService = PropertiesService();
+  final ConfigService _configService = ConfigService();
   bool _isLoading = true;
   List<LookupItem> _cities = [];
   List<AreaLookup> _areas = [];
@@ -305,6 +309,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildAboutCard() {
+    return CRMCard(
+      title: 'About PropKart',
+      subtitle: 'View software version details and check for updates',
+      child: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snapshot) {
+          final version = snapshot.data?.version ?? '1.0.0';
+          final buildNumber = snapshot.data?.buildNumber ?? '1';
+          
+          return FutureBuilder<String>(
+            future: _configService.getLastCheckedTime(),
+            builder: (context, lastCheckedSnapshot) {
+              final lastChecked = lastCheckedSnapshot.data ?? 'Never Checked';
+              
+              return Padding(
+                padding: const EdgeInsets.only(top: CRMSpacing.m),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildAboutRow('App Version', version),
+                    const Divider(height: CRMSpacing.m),
+                    _buildAboutRow('Build Number', buildNumber),
+                    const Divider(height: CRMSpacing.m),
+                    _buildAboutRow('Last Checked', lastChecked),
+                    const SizedBox(height: CRMSpacing.l),
+                    CRMButton(
+                      label: 'Check for Updates',
+                      onPressed: () => _checkForUpdates(context),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAboutRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: CRMTypography.bodyMedium.copyWith(
+            color: CRMColors.textOf(context),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          value,
+          style: CRMTypography.body.copyWith(
+            color: CRMColors.textSecondaryOf(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _checkForUpdates(BuildContext context) async {
+    try {
+      final config = await _configService.fetchAppConfig();
+      if (mounted) {
+        setState(() {}); // refresh "Last Checked"
+        
+        if (config.versionStatus == "forceUpdate" || config.versionStatus == "softUpdate") {
+          showDialog(
+            context: context,
+            builder: (dialogContext) => UpdateDialog(
+              isForceUpdate: config.versionStatus == "forceUpdate",
+              androidLink: config.androidLink,
+              iosLink: config.iosLink,
+              onDismiss: () => Navigator.pop(dialogContext),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your application is up to date.'),
+              backgroundColor: CRMColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check for updates: $e'),
+            backgroundColor: CRMColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildAuditLogsCard() {
     return CRMCard(
       title: 'Audit Logs',
@@ -383,6 +485,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: CRMSpacing.l),
                     _buildAuditLogsCard(),
                     const SizedBox(height: CRMSpacing.l),
+                    _buildAboutCard(),
+                    const SizedBox(height: CRMSpacing.l),
                     _buildCityCard(),
                     const SizedBox(height: CRMSpacing.l),
                     _buildAreaCard(),
@@ -399,6 +503,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _buildAppearanceCard(isAdminOrSuperAdmin),
                               const SizedBox(height: CRMSpacing.l),
                               _buildAuditLogsCard(),
+                              const SizedBox(height: CRMSpacing.l),
+                              _buildAboutCard(),
                             ],
                           ),
                         ),

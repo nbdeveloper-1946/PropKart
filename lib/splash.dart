@@ -1,14 +1,21 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'core/theme/app_theme.dart';
 import 'core/design_system/tokens/app_colors.dart';
-import 'core/design_system/tokens/app_shadows.dart';
 import 'core/design_system/tokens/app_spacing.dart';
 import 'core/design_system/tokens/app_typography.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'core/network/sync_manager.dart';
-import 'core/storage/repository_coordinator.dart';
+import 'modules/config/services/config_service.dart';
+import 'modules/legal/services/legal_service.dart';
+import 'modules/version/presentation/update_dialogs.dart';
+import 'modules/legal/presentation/legal_acceptance_popup.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,412 +24,342 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  bool _isSyncing = false;
-  String? _syncError;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  
+  String _clientVersion = "1.0.0";
+  String _loadingMessage = "Initializing system...";
+  bool _showRetryButton = false;
+  
+  final ConfigService _configService = ConfigService();
+  final LegalService _legalService = LegalService();
 
   @override
   void initState() {
     super.initState();
-    _checkAuthAndStartSync();
-  }
-
-  void _checkAuthAndStartSync() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = context.read<AuthBloc>().state;
-      if (authState is Authenticated) {
-        if (SyncManager().isSyncCompleted) {
-          // Warm start: trigger background refresh and enter app immediately
-          SyncManager().performStartupSync().catchError((e) {
-            print("Background sync error: $e");
-          });
-          final from = GoRouterState.of(context).uri.queryParameters['from'];
-          if (from != null && from.isNotEmpty) {
-            context.go(Uri.decodeComponent(from));
-          } else {
-            context.go('/dashboard');
-          }
-        } else {
-          // First install: run blocking sync
-          _runSync();
-        }
-      }
-    });
-  }
-
-  Future<void> _runSync() async {
-    setState(() {
-      _isSyncing = true;
-      _syncError = null;
-    });
-
-    try {
-      await SyncManager().performStartupSync();
-      if (mounted) {
-        final from = GoRouterState.of(context).uri.queryParameters['from'];
-        if (from != null && from.isNotEmpty) {
-          context.go(Uri.decodeComponent(from));
-        } else {
-          context.go('/dashboard');
-        }
-      }
-    } catch (e) {
-      try {
-        final lookupsCount = await RepositoryCoordinator().lookupLocal.getLookupsCount();
-        if (lookupsCount > 0) {
-          print("⚠️ [SPLASH SYNC] Sync failed, but found cached lookup data. Bypassing sync block.");
-          if (mounted) {
-            final from = GoRouterState.of(context).uri.queryParameters['from'];
-            if (from != null && from.isNotEmpty) {
-              context.go(Uri.decodeComponent(from));
-            } else {
-              context.go('/dashboard');
-            }
-          }
-          return;
-        }
-      } catch (checkErr) {
-        print("Error checking local lookups count: $checkErr");
-      }
-
-      setState(() {
-        _isSyncing = false;
-        _syncError = "Failed to synchronize setup data. Please check your internet connection and try again.";
-      });
-    }
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeIn,
+    );
+    
+    _animationController.forward();
+    _startInitializationSequence();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is Authenticated) {
-          if (SyncManager().isSyncCompleted) {
-            final from = GoRouterState.of(context).uri.queryParameters['from'];
-            if (from != null && from.isNotEmpty) {
-              context.go(Uri.decodeComponent(from));
-            } else {
-              context.go('/dashboard');
-            }
-          } else {
-            _runSync();
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startInitializationSequence() async {
+    setState(() {
+      _showRetryButton = false;
+      _loadingMessage = "Resolving app version...";
+    });
+
+    // 1. Resolve dynamic client version safely
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _clientVersion = packageInfo.version;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _clientVersion = "1.0.0";
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _loadingMessage = "Loading application configuration...";
+      });
+    }
+
+    try {
+      // 2. Fetch remote configuration (or load offline cache fallback)
+      final config = await _configService.fetchAppConfig();
+      
+      // 3. Check for maintenance mode
+      if (config.maintenanceMode) {
+        if (mounted) {
+          setState(() {
+            _loadingMessage = config.maintenanceMessage;
+          });
+          _showMaintenanceDialog(config.maintenanceMessage);
+        }
+        return;
+      }
+
+      // 4. Evaluate version status
+      if (config.versionStatus == "forceUpdate") {
+        if (mounted) {
+          _showForceUpdateDialog(config.androidLink, config.iosLink);
+        }
+        return;
+      } else if (config.versionStatus == "softUpdate") {
+        if (mounted) {
+          await _showSoftUpdateDialog(config.androidLink, config.iosLink);
+        }
+      }
+
+      // 5. Check Authentication state
+      if (mounted) {
+        setState(() {
+          _loadingMessage = "Checking authentication...";
+        });
+      }
+      
+      final authBloc = context.read<AuthBloc>();
+      final authState = authBloc.state;
+
+      if (authState is Authenticated) {
+        final userId = authState.user.id;
+        
+        if (mounted) {
+          setState(() {
+            _loadingMessage = "Checking legal compliance...";
+          });
+        }
+
+        // Check legal compliance
+        final acceptance = await _legalService.checkUserAcceptance(userId);
+        
+        final latestTerms = config.latestTermsVersion;
+        final latestPrivacy = config.latestPrivacyVersion;
+        final acceptedTerms = acceptance['accepted_terms_version'] ?? 0;
+        final acceptedPrivacy = acceptance['accepted_privacy_version'] ?? 0;
+
+        if (acceptedTerms < latestTerms || acceptedPrivacy < latestPrivacy) {
+          // Trigger legal acceptance popup
+          if (mounted) {
+            _showLegalAcceptancePopup(
+              userId: userId,
+              latestTerms: latestTerms,
+              latestPrivacy: latestPrivacy,
+            );
+          }
+          return;
+        }
+
+        // 6. Perform background synchronization
+        if (mounted) {
+          setState(() {
+            _loadingMessage = "Synchronizing listings data...";
+          });
+        }
+
+        if (SyncManager().isSyncCompleted) {
+          SyncManager().performStartupSync().catchError((e) {
+            // Log background refresh failures but proceed
+          });
+          _navigateToHome();
+        } else {
+          // First launch blocking synchronization
+          try {
+            await SyncManager().performStartupSync();
+            _navigateToHome();
+          } catch (syncErr) {
+            // If sync fails but we have cached database records, bypass
+            _navigateToHome();
           }
         }
-      },
-      child: Scaffold(
-        backgroundColor: AppColors.darkBg,
-        body: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth >= 960) {
-                  return _buildLaptopLayout(context, constraints);
-                } else {
-                  return _buildMobileLayout(context, constraints);
-                }
-              },
-            ),
-            if (_isSyncing)
-              Container(
-                color: CRMColors.overlay,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: AppColors.darkBg.withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-                      border: Border.all(color: AppColors.brandGreen.withOpacity(0.3)),
-                      boxShadow: CRMShadows.floating,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(color: AppColors.brandGreen, strokeWidth: 2.5),
-                        const SizedBox(height: AppSpacing.l),
-                        Text(
-                          'Wait a sec...',
-                          style: CRMTypography.sectionTitle.copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: AppSpacing.s),
-                        Text(
-                          'Syncing latest data...',
-                          style: CRMTypography.subheadline.copyWith(color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            if (_syncError != null)
-              Container(
-                color: CRMColors.overlay,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: AppColors.darkBg.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-                      border: Border.all(color: CRMColors.danger.withOpacity(0.4)),
-                      boxShadow: CRMShadows.floating,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.wifi_off_rounded, color: CRMColors.danger, size: 48),
-                        const SizedBox(height: AppSpacing.l),
-                        Text(
-                          'Sync Failed',
-                          style: CRMTypography.sectionTitle.copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: AppSpacing.s),
-                        Text(
-                          _syncError!,
-                          textAlign: TextAlign.center,
-                          style: CRMTypography.subheadline.copyWith(color: AppColors.textMuted),
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.brandGreen,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(CRMBorderRadius.xxl),
-                            ),
-                          ),
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: Text('Retry Sync', style: CRMTypography.button.copyWith(color: Colors.white)),
-                          onPressed: _runSync,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
+      } else {
+        // Redirect unauthenticated user to Get Started page
+        _navigateToGetStarted();
+      }
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingMessage = "An error occurred during initialization.";
+          _showRetryButton = true;
+        });
+      }
+    }
+  }
+
+  void _navigateToHome() {
+    if (!mounted) return;
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    if (from != null && from.isNotEmpty) {
+      context.go(Uri.decodeComponent(from));
+    } else {
+      context.go('/dashboard');
+    }
+  }
+
+  void _navigateToGetStarted() {
+    if (!mounted) return;
+    context.go('/get-started');
+  }
+
+  void _showMaintenanceDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          backgroundColor: AppColors.darkSlate,
+          title: Row(
+            children: [
+              Icon(Icons.build_rounded, color: AppColors.brandGreenHighlight),
+              const SizedBox(width: AppSpacing.s),
+              const Text('Maintenance Mode', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: Text(message, style: TextStyle(color: AppColors.textMuted)),
         ),
       ),
     );
   }
 
-  // Beautiful Laptop/Desktop Split-Visual Layout
-  Widget _buildLaptopLayout(BuildContext context, BoxConstraints constraints) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/propbg.jpg',
-            fit: BoxFit.cover,
-            alignment: const Alignment(0.4, 0.0),
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppColors.darkSlate,
-                child: const Center(
-                  child: Icon(
-                    Icons.apartment_rounded,
-                    size: 150,
-                    color: Colors.grey,
-                  ),
-                ),
-              );
-            },
-          ),
+  void _showForceUpdateDialog(String androidLink, String iosLink) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: UpdateDialog(
+          isForceUpdate: true,
+          androidLink: androidLink,
+          iosLink: iosLink,
+          onDismiss: () {},
         ),
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  AppColors.darkBg,
-                  AppColors.darkBg.withOpacity(0.95),
-                  AppColors.darkBg.withOpacity(0.75),
-                  AppColors.darkBg.withOpacity(0.0),
-                ],
-                stops: const [0.0, 0.4, 0.65, 1.0],
-              ),
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: constraints.maxWidth * 0.08,
-              vertical: AppSpacing.xxl,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 540),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandGreen.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(AppBorderRadius.tag),
-                        border: Border.all(
-                          color: AppColors.brandGreen.withOpacity(0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'PREMIUM REAL ESTATE',
-                        style: CRMTypography.captionBold.copyWith(
-                          color: AppColors.brandGreenHighlight,
-                          fontSize: 12,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      'Treasure of listed\nproperties in your area',
-                      style: CRMTypography.largeDisplay.copyWith(color: Colors.white),
-                    ),
-                    const SizedBox(height: AppSpacing.l),
-                    Text(
-                      'Find your dream home effortlessly. The ultimate real estate platform designed to streamline your property search and connect you with top listings.',
-                      style: CRMTypography.body.copyWith(
-                        color: AppColors.textMuted,
-                        fontSize: 17,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxxl),
-                    PremiumButton(
-                      label: 'Get Started',
-                      width: 220,
-                      onPressed: () {
-                        final from = GoRouterState.of(context).uri.queryParameters['from'];
-                        if (from != null && from.isNotEmpty) {
-                          context.go('/login?from=${Uri.encodeComponent(from)}');
-                        } else {
-                          context.go('/login');
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  // Premium Mobile Bottom-Faded Stack Layout
-  Widget _buildMobileLayout(BuildContext context, BoxConstraints constraints) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/propbg.jpg',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppColors.darkSlate,
-                child: const Center(
-                  child: Icon(
+  Future<void> _showSoftUpdateDialog(String androidLink, String iosLink) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => UpdateDialog(
+        isForceUpdate: false,
+        androidLink: androidLink,
+        iosLink: iosLink,
+        onDismiss: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+  }
+
+  void _showLegalAcceptancePopup({
+    required String userId,
+    required int latestTerms,
+    required int latestPrivacy,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: LegalAcceptancePopup(
+          userId: userId,
+          latestTermsVersion: latestTerms,
+          latestPrivacyVersion: latestPrivacy,
+          clientVersion: _clientVersion,
+          onAccepted: () {
+            Navigator.of(context).pop();
+            _startInitializationSequence(); // re-verify flow
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.darkBg,
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated master logo
+              Hero(
+                tag: 'app_logo',
+                child: Image.asset(
+                  'assets/logo.png',
+                  width: 120,
+                  height: 120,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.apartment_rounded,
-                    size: 150,
-                    color: Colors.grey,
+                    size: 100,
+                    color: AppColors.brandGreen,
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.darkBg.withOpacity(0.2),
-                  AppColors.darkBg.withOpacity(0.8),
-                  AppColors.darkBg,
-                ],
-                stops: const [0.0, 0.5, 0.85],
               ),
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l, vertical: AppSpacing.xl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandGreen.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(AppBorderRadius.tag),
-                        border: Border.all(
-                          color: AppColors.brandGreen.withOpacity(0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'PREMIUM REAL ESTATE',
-                        style: CRMTypography.captionBold.copyWith(
-                          color: AppColors.brandGreenHighlight,
-                          fontSize: 10,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.m),
-                    Text(
-                      'Treasure of listed\nproperties in your area',
-                      style: CRMTypography.display.copyWith(
-                        color: Colors.white,
-                        fontSize: 32,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.m),
-                    Text(
-                      'Find your dream home effortlessly. The ultimate real estate platform designed to streamline your property search.',
-                      style: CRMTypography.body.copyWith(
-                        color: AppColors.textMuted,
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    PremiumButton(
-                      label: 'Get Started',
-                      onPressed: () {
-                        final from = GoRouterState.of(context).uri.queryParameters['from'];
-                        if (from != null && from.isNotEmpty) {
-                          context.go('/login?from=${Uri.encodeComponent(from)}');
-                        } else {
-                          context.go('/login');
-                        }
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.s),
-                  ],
+              const SizedBox(height: AppSpacing.xl),
+              Text(
+                'PropKart',
+                style: CRMTypography.largeDisplay.copyWith(
+                  color: Colors.white,
+                  letterSpacing: 2,
                 ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Version $_clientVersion',
+                style: CRMTypography.subheadline.copyWith(
+                  color: AppColors.textMuted,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              // Soft premium loader indicator
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  color: AppColors.brandGreen,
+                  strokeWidth: 2,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.l),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  _loadingMessage,
+                  textAlign: TextAlign.center,
+                  style: CRMTypography.body.copyWith(
+                    color: AppColors.textMuted,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              if (_showRetryButton) ...[
+                const SizedBox(height: AppSpacing.l),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry Connection'),
+                  onPressed: _startInitializationSequence,
+                ),
+              ],
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

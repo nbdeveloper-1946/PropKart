@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'bloc/auth_bloc.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/design_system/tokens/app_colors.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
+  bool _acceptTerms = false;
 
   @override
   void dispose() {
@@ -215,6 +217,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _submit() {
+    if (!_acceptTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please accept the Terms & Conditions and Privacy Policy to continue.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+      return;
+    }
     if (_formKey.currentState?.validate() ?? false) {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
@@ -456,6 +467,70 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: -0.2,
                       ),
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: Checkbox(
+                    value: _acceptTerms,
+                    activeColor: CRMColors.primaryOf(context),
+                    checkColor: Colors.white,
+                    side: BorderSide(color: CRMColors.borderOf(context), width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _acceptTerms = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'I accept the ',
+                        style: CRMTypography.label.copyWith(
+                          color: CRMColors.textSecondaryOf(context),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/terms-and-conditions'),
+                        child: Text(
+                          'Terms & Conditions',
+                          style: CRMTypography.label.copyWith(
+                            color: CRMColors.primaryOf(context),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        ' and ',
+                        style: CRMTypography.label.copyWith(
+                          color: CRMColors.textSecondaryOf(context),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/privacy-policy'),
+                        child: Text(
+                          'Privacy Policy',
+                          style: CRMTypography.label.copyWith(
+                            color: CRMColors.primaryOf(context),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

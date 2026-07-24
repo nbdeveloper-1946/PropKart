@@ -15,6 +15,9 @@ import '../../features/clients/screens/clients_screen.dart';
 import '../../features/owners/screens/owners_screen.dart';
 import '../../features/builders/screens/builders_screen.dart';
 import '../../splash.dart';
+import '../../get_started_screen.dart';
+import '../../modules/legal/presentation/terms_and_conditions_page.dart';
+import '../../modules/legal/presentation/privacy_policy_page.dart';
 import '../design_system/widgets/app_shell.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/audit_logs_screen.dart';
@@ -54,6 +57,18 @@ class AppRouter {
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/get-started',
+        builder: (context, state) => const GetStartedScreen(),
+      ),
+      GoRoute(
+        path: '/terms-and-conditions',
+        builder: (context, state) => const TermsAndConditionsPage(),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        builder: (context, state) => const PrivacyPolicyPage(),
       ),
       GoRoute(
         path: '/login',
@@ -142,6 +157,7 @@ class AppRouter {
       final authState = authBloc.state;
       final loggingIn = state.matchedLocation == '/login';
       final onSplash = state.matchedLocation == '/splash';
+      final onGetStarted = state.matchedLocation == '/get-started';
       final isPublicShare = state.matchedLocation.startsWith('/share/');
 
       if (authState is Authenticated) {
@@ -163,9 +179,9 @@ class AppRouter {
           return '/dashboard';
         }
       } else if (authState is Unauthenticated) {
-        if (!loggingIn && !onSplash && !isPublicShare) {
+        if (!loggingIn && !onSplash && !onGetStarted && !isPublicShare) {
           final target = state.uri.toString();
-          return '/splash?from=${Uri.encodeComponent(target)}';
+          return '/get-started?from=${Uri.encodeComponent(target)}';
         }
       }
       return null;
