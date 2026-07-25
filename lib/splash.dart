@@ -1,14 +1,10 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/design_system/tokens/app_colors.dart';
-import 'core/design_system/tokens/app_spacing.dart';
 import 'core/design_system/tokens/app_typography.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'core/network/sync_manager.dart';
@@ -31,6 +27,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   String _clientVersion = "1.0.0";
   String _loadingMessage = "Initializing system...";
   bool _showRetryButton = false;
+  double _progress = 0.0;
   late DateTime _startTime;
   
   final ConfigService _configService = ConfigService();
@@ -63,6 +60,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     setState(() {
       _showRetryButton = false;
       _loadingMessage = "Resolving app version...";
+      _progress = 0.15;
     });
 
     // 1. Resolve dynamic client version safely
@@ -84,6 +82,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (mounted) {
       setState(() {
         _loadingMessage = "Loading application configuration...";
+        _progress = 0.35;
       });
     }
 
@@ -118,6 +117,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (mounted) {
         setState(() {
           _loadingMessage = "Checking authentication...";
+          _progress = 0.55;
         });
       }
       
@@ -130,6 +130,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() {
             _loadingMessage = "Checking legal compliance...";
+            _progress = 0.75;
           });
         }
 
@@ -157,6 +158,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() {
             _loadingMessage = "Synchronizing listings data...";
+            _progress = 0.90;
           });
         }
 
@@ -191,6 +193,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigateToHome() async {
+    if (mounted) {
+      setState(() {
+        _progress = 1.0;
+      });
+    }
     if (!mounted) return;
     await _ensureMinSplashDelay();
     if (!mounted) return;
@@ -203,6 +210,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigateToGetStarted() async {
+    if (mounted) {
+      setState(() {
+        _progress = 1.0;
+      });
+    }
     if (!mounted) return;
     await _ensureMinSplashDelay();
     if (!mounted) return;
@@ -339,13 +351,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
-              // Soft premium loader indicator
-              SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(
-                  color: primaryColor,
-                  strokeWidth: 2,
+              // Interactive Premium Linear Progress Bar
+              Container(
+                width: 250,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: CRMColors.borderOf(context).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: _progress,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.l),

@@ -9,6 +9,7 @@ import '../../../core/storage/crm_draft_repository.dart';
 import '../../owners/repository/owners_repository.dart';
 import '../../owners/models/owner_model.dart';
 import '../../requirements/repository/requirements_repository.dart';
+import '../../../core/storage/repository_coordinator.dart';
 
 class AddEditRequirementScreen extends StatefulWidget {
   final RequirementModel? requirement;
@@ -306,7 +307,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
     return false;
   }
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_nameController.text.trim().isEmpty || _mobileController.text.trim().isEmpty) {
       _jumpToStep(0);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -345,6 +346,49 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
         const SnackBar(content: Text("Please enter a Target Budget."), backgroundColor: CRMColors.danger),
       );
       return;
+    }
+
+    final clientName = _nameController.text.trim().toLowerCase();
+    final clientMobile = _mobileController.text.trim().toLowerCase();
+
+    if (clientName.isNotEmpty && clientMobile.isNotEmpty) {
+      try {
+        final allReqs = await RepositoryCoordinator().requirementLocal.getRequirements();
+        final isDuplicate = allReqs.any((r) =>
+          r.id != widget.requirement?.id &&
+          r.clientName.toLowerCase() == clientName &&
+          r.clientMobile == clientMobile
+        );
+        if (isDuplicate) {
+          if (mounted) {
+            final proceed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+                backgroundColor: CRMColors.surfaceElevatedOf(context),
+                title: Text('Duplicate Requirement Detected', style: CRMTypography.sectionTitle),
+                content: Text(
+                  'A requirement for client "${_nameController.text}" with mobile number "${_mobileController.text}" already exists.\n\nAre you sure you want to save this duplicate requirement?',
+                  style: CRMTypography.body,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Save Anyway'),
+                  ),
+                ],
+              ),
+            );
+            if (proceed != true) return;
+          }
+        }
+      } catch (e) {
+        print("⚠️ [DUPLICATE CHECK ERROR] $e");
+      }
     }
 
     final cat = _categories.firstWhere(

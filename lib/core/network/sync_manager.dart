@@ -237,6 +237,8 @@ class SyncManager {
     final ownersToPut = <OwnerLocal>[];
     final ownersToDelete = <String>[];
 
+    final apiClient = ApiClient();
+
     for (final item in batch) {
       final table = item['table'] as String;
       final type = item['type'] as String;
@@ -256,11 +258,43 @@ class SyncManager {
         }
       } else if (record != null) {
         if (table == "properties") {
-          final enriched = await _enrichRawRecord("properties", record);
-          propertiesToPut.add(PropertyModel.fromJson(enriched).toLocal());
+          try {
+            final id = record['id'] as String;
+            final response = await apiClient.get('/properties/$id');
+            if (response.statusCode == 200 && response.data != null) {
+              final data = response.data['data']?['property'];
+              if (data != null) {
+                propertiesToPut.add(PropertyModel.fromJson(data).toLocal());
+              } else {
+                throw Exception("Property data not found in response");
+              }
+            } else {
+              throw Exception("Failed to fetch property details: Status ${response.statusCode}");
+            }
+          } catch (e) {
+            print("⚠️ [SYNC WARNING] Failed to fetch property details for $record, falling back to raw record: $e");
+            final enriched = await _enrichRawRecord("properties", record);
+            propertiesToPut.add(PropertyModel.fromJson(enriched).toLocal());
+          }
         } else if (table == "requirements") {
-          final enriched = await _enrichRawRecord("requirements", record);
-          requirementsToPut.add(RequirementModel.fromJson(enriched).toLocal());
+          try {
+            final id = record['id'] as String;
+            final response = await apiClient.get('/requirements/$id');
+            if (response.statusCode == 200 && response.data != null) {
+              final data = response.data['data']?['requirement'];
+              if (data != null) {
+                requirementsToPut.add(RequirementModel.fromJson(data).toLocal());
+              } else {
+                throw Exception("Requirement data not found in response");
+              }
+            } else {
+              throw Exception("Failed to fetch requirement details: Status ${response.statusCode}");
+            }
+          } catch (e) {
+            print("⚠️ [SYNC WARNING] Failed to fetch requirement details for $record, falling back to raw record: $e");
+            final enriched = await _enrichRawRecord("requirements", record);
+            requirementsToPut.add(RequirementModel.fromJson(enriched).toLocal());
+          }
         } else if (table == "followups") {
           followupsToPut.add(DashboardFollowup.fromJson(record).toLocal('System'));
         } else if (table == "builders") {

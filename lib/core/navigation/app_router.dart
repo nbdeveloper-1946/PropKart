@@ -162,11 +162,10 @@ class AppRouter {
 
       if (authState is Authenticated) {
         if (loggingIn) {
+          SyncManager().isSyncCompleted = false;
           final from = state.uri.queryParameters['from'];
-          if (from != null && from.isNotEmpty) {
-            return Uri.decodeComponent(from);
-          }
-          return '/dashboard';
+          final target = from != null && from.isNotEmpty ? Uri.decodeComponent(from) : '/dashboard';
+          return '/splash?from=${Uri.encodeComponent(target)}';
         }
         if (onSplash) {
           if (!SyncManager().isSyncCompleted) {

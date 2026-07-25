@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -27,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final PropertiesService _propertiesService = PropertiesService();
   final ConfigService _configService = ConfigService();
   bool _isLoading = true;
+  bool _isFetchingPincode = false;
   List<LookupItem> _cities = [];
   List<AreaLookup> _areas = [];
   String? _selectedCityForArea;
@@ -40,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     ThemeManager().addListener(_onThemeChanged);
     _loadLocationMetadata();
+    _pincodeController.addListener(_onPincodeChanged);
   }
 
   void _onThemeChanged() {
@@ -74,6 +77,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final name = _cityController.text.trim();
     if (name.isEmpty) return;
 
+    // Check for duplicates
+    final cityExists = _cities.any((c) => c.name.toLowerCase() == name.toLowerCase());
+    if (cityExists) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+          backgroundColor: CRMColors.surfaceElevatedOf(context),
+          title: Text('Duplicate City', style: CRMTypography.sectionTitle),
+          content: Text('A city named "$name" already exists in the configuration.', style: CRMTypography.body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final result = await _propertiesService.createCity(name);
@@ -103,6 +127,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final pincode = _pincodeController.text.trim();
     if (name.isEmpty || pincode.isEmpty || _selectedCityForArea == null) return;
 
+    // Check for duplicates
+    final areaExists = _areas.any((a) =>
+      a.cityId == _selectedCityForArea &&
+      a.name.toLowerCase() == name.toLowerCase() &&
+      a.pincode == pincode
+    );
+    if (areaExists) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+          backgroundColor: CRMColors.surfaceElevatedOf(context),
+          title: Text('Duplicate Area', style: CRMTypography.sectionTitle),
+          content: Text('An area named "$name" with Pincode "$pincode" already exists for the selected city.', style: CRMTypography.body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       await _propertiesService.createArea(_selectedCityForArea!, name, pincode);
@@ -119,6 +168,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to add area: $e'), backgroundColor: CRMColors.danger),
       );
+    }
+  }
+
+  void _onPincodeChanged() {
+    final pincode = _pincodeController.text.trim();
+    if (pincode.length == 6 && !_isFetchingPincode) {
+      _lookupPincode(pincode);
+    }
+  }
+
+  Future<void> _lookupPincode(String pincode) async {
+    setState(() => _isFetchingPincode = true);
+    try {
+      final dio = Dio();
+      final response = await dio.get('https://api.postalpincode.in/pincode/$pincode');
+      
+      if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
+        final data = response.data[0] as Map<String, dynamic>;
+        final status = data['Status']?.toString();
+        final postOffices = data['PostOffice'] as List?;
+        
+        if (status == 'Success' && postOffices != null && postOffices.isNotEmpty) {
+          final firstOffice = postOffices[0] as Map<String, dynamic>;
+          final districtName = firstOffice['District']?.toString() ?? '';
+          
+          LookupItem? matchedCity;
+          for (final city in _cities) {
+            if (city.name.toLowerCase() == districtName.toLowerCase()) {
+              matchedCity = city;
+              break;
+            }
+          }
+          
+          void showAreaSelection(String cityId, String cityName) {
+            final List<String> areaNames = postOffices
+                .map((po) => po['Name']?.toString() ?? '')
+                .where((name) => name.isNotEmpty)
+                .toSet() // Remove duplicates from response
+                .toList();
+            
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+                backgroundColor: CRMColors.surfaceElevatedOf(context),
+                title: Text('Select Area for $pincode ($cityName)', style: CRMTypography.sectionTitle),
+                content: SizedBox(
+                  width: 300,
+                  height: 250,
+                  child: ListView.builder(
+                    itemCount: areaNames.length,
+                    itemBuilder: (context, index) {
+                      final areaName = areaNames[index];
+                      return ListTile(
+                        title: Text(areaName, style: TextStyle(color: CRMColors.textOf(context))),
+                        onTap: () {
+                          _areaNameController.text = areaName;
+                          setState(() {
+                            _selectedCityForArea = cityId;
+                          });
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            );
+          }
+          
+          if (matchedCity != null) {
+            showAreaSelection(matchedCity.id, matchedCity.name);
+          } else if (districtName.isNotEmpty) {
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+                  backgroundColor: CRMColors.surfaceElevatedOf(context),
+                  title: Text('City Mapping Not Found', style: CRMTypography.sectionTitle),
+                  content: Text('Pincode $pincode is located in "$districtName", but this city is not configured in your settings. Would you like to add "$districtName" as a new city first?', style: CRMTypography.body),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('No'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        setState(() => _isLoading = true);
+                        try {
+                          final result = await _propertiesService.createCity(districtName);
+                          final newCity = LookupItem(
+                            id: result['data']['city']['id'],
+                            name: result['data']['city']['city_name'],
+                          );
+                          setState(() {
+                            _cities.add(newCity);
+                            _selectedCityForArea = newCity.id;
+                            _isLoading = false;
+                          });
+                          showAreaSelection(newCity.id, newCity.name);
+                          _loadLocationMetadata();
+                        } catch (e) {
+                          setState(() => _isLoading = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to auto-add city: $e'), backgroundColor: CRMColors.danger),
+                          );
+                        }
+                      },
+                      child: const Text('Yes, Add City'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("⚠️ [POSTAL API ERROR] Failed to fetch postal details: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingPincode = false);
+      }
     }
   }
 
@@ -680,6 +860,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       borderRadius: BorderRadius.circular(CRMBorderRadius.input),
                       borderSide: BorderSide(color: CRMColors.primaryOf(context), width: 1.5),
                     ),
+                    suffixIcon: _isFetchingPincode
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
                   ),
                   keyboardType: TextInputType.number,
                 ),

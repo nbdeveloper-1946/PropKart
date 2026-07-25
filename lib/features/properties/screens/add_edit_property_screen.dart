@@ -11,6 +11,7 @@ import '../models/property_model.dart';
 import '../services/properties_service.dart';
 import '../repository/properties_repository.dart';
 import '../../../core/storage/crm_draft_repository.dart';
+import '../../../core/storage/repository_coordinator.dart';
 import '../../../core/design_system/widgets/form/crm_video_picker.dart';
 
 class AddEditPropertyScreen extends StatefulWidget {
@@ -826,6 +827,51 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
       return;
     }
 
+    final flat = _flatNoController.text.trim().toLowerCase();
+    final block = _blockWingController.text.trim().toLowerCase();
+    final landmark = _landmarkController.text.trim().toLowerCase();
+
+    if (flat.isNotEmpty) {
+      try {
+        final allProps = await RepositoryCoordinator().propertyLocal.getProperties();
+        final isDuplicate = allProps.any((p) =>
+          p.id != widget.property?.id &&
+          p.flatNo?.toLowerCase() == flat &&
+          p.blockWing?.toLowerCase() == block &&
+          p.landmark?.toLowerCase() == landmark
+        );
+        if (isDuplicate) {
+          if (mounted) {
+            final proceed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.card)),
+                backgroundColor: CRMColors.surfaceElevatedOf(context),
+                title: Text('Duplicate Property Detected', style: CRMTypography.sectionTitle),
+                content: Text(
+                  'An active property with the same Flat No ("${_flatNoController.text}"), Block/Wing ("${_blockWingController.text}"), and Landmark ("${_landmarkController.text}") already exists.\n\nAre you sure you want to save this duplicate property?',
+                  style: CRMTypography.body,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Save Anyway'),
+                  ),
+                ],
+              ),
+            );
+            if (proceed != true) return;
+          }
+        }
+      } catch (e) {
+        print("⚠️ [DUPLICATE CHECK ERROR] $e");
+      }
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -906,7 +952,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         'carpet_area': double.tryParse(_carpetController.text),
         'plot_area': double.tryParse(_plotController.text),
         'price': CRMCurrencyFormatter.parse(_priceController.text),
-        'deposit': double.tryParse(_depositController.text) ?? 0.0,
+        'deposit': CRMCurrencyFormatter.parse(_depositController.text),
         'maintenance': double.tryParse(_maintenanceController.text) ?? 0.0,
         'furnishing_type_id': _selectedFurnishing,
         'facing_type_id': _selectedFacing,
