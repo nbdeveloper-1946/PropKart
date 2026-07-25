@@ -44,6 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   int _notePage = 1;
   static const int _notesPerPage = 5;
+  final Map<String, bool> _optimisticChecklistStates = {};
 
   @override
   void initState() {
@@ -79,7 +80,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dateString = _getFormattedDate();
     final greeting = _getGreeting();
 
-    return BlocBuilder<DashboardBloc, DashboardState>(
+    return BlocConsumer<DashboardBloc, DashboardState>(
+      listener: (context, state) {
+        if (state is DashboardLoadedState || state is DashboardRefreshing) {
+          _optimisticChecklistStates.clear();
+        }
+      },
       builder: (context, state) {
         if (state is DashboardLoading || state is DashboardInitial) {
           return const Padding(
@@ -1113,6 +1119,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTaskTile(ChecklistItem item) {
+    final bool isCompleted = _optimisticChecklistStates.containsKey(item.id)
+        ? _optimisticChecklistStates[item.id]!
+        : item.isCompleted;
+
     return Container(
       margin: const EdgeInsets.only(bottom: CRMSpacing.s),
       padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.xs),
@@ -1124,16 +1134,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         children: [
           Checkbox(
-            value: item.isCompleted,
+            value: isCompleted,
             activeColor: CRMColors.success,
             onChanged: (val) async {
               if (val != null) {
+                setState(() {
+                  _optimisticChecklistStates[item.id] = val;
+                });
                 try {
                   await DioClient.dio.patch('/checklist/${item.id}/toggle', data: {'is_completed': val});
                   if (mounted) {
                     context.read<DashboardBloc>().add(RefreshDashboard());
                   }
-                } catch (_) {}
+                } catch (_) {
+                  if (mounted) {
+                    setState(() {
+                      _optimisticChecklistStates.remove(item.id);
+                    });
+                  }
+                }
               }
             },
           ),
@@ -1144,7 +1163,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: CRMTypography.bodyMedium.copyWith(
                 color: CRMColors.textOf(context),
                 fontWeight: FontWeight.w600,
-                decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                decoration: isCompleted ? TextDecoration.lineThrough : null,
               ),
             ),
           ),

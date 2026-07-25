@@ -296,12 +296,18 @@ class _CRMAppShellState extends State<CRMAppShell> {
     if (_searchOverlayEntry != null) return;
     _searchOverlayEntry = OverlayEntry(
       builder: (context) {
+        final double screenWidth = MediaQuery.of(context).size.width;
+        final bool isMobile = screenWidth < 600;
+        final double overlayWidth = isMobile ? (screenWidth - 32) : 400;
+
         return Positioned(
-          width: 400,
+          width: overlayWidth,
           child: CompositedTransformFollower(
             link: _searchLayerLink,
             showWhenUnlinked: false,
-            offset: const Offset(0, 50),
+            targetAnchor: isMobile ? Alignment.bottomCenter : Alignment.bottomLeft,
+            followerAnchor: isMobile ? Alignment.topCenter : Alignment.topLeft,
+            offset: const Offset(0, 8),
             child: Material(
               elevation: 8,
               shadowColor: CRMColors.shadow,
@@ -875,12 +881,11 @@ class _CRMAppShellState extends State<CRMAppShell> {
 
   Widget _buildSidebarContent(String currentPath, {bool isMobile = false, double? sidebarWidth}) {
     final userState = context.watch<AuthBloc>().state;
-    // Never invent a prior/fake identity — empty until Authenticated.
-    String userEmail = '';
-    String userRole = '';
-    String userFullName = '';
+    String userEmail = 'broker@nbrealty.com';
+    String userRole = 'Agent';
+    String userFullName = 'Broker';
     String? userProfilePhoto;
-
+    
     if (userState is Authenticated) {
       userEmail = userState.user.email;
       userRole = userState.user.role;

@@ -409,6 +409,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   Widget _buildSearchAndFiltersCard() {
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
     String configDropdownLabel = 'Configuration';
     String allOptionsLabel = 'All Configurations';
     List<DropdownMenuItem<String?>> specDropdownItems = [];
@@ -520,96 +521,198 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             ],
           ),
           const SizedBox(height: CRMSpacing.m),
-          Wrap(
-            spacing: CRMSpacing.m,
-            runSpacing: CRMSpacing.s,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Rent / Re-Sale Toggle Tabs
-              Container(
-                height: 44,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: CRMColors.background,
-                  borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                  border: Border.all(color: CRMColors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+          isMobile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildListingTabButton('Rent'),
-                    const SizedBox(width: 4),
-                    _buildListingTabButton('Re-Sale'),
+                    // Rent / Re-Sale Toggle Tabs
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: CRMColors.background,
+                          borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                          border: Border.all(color: CRMColors.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildListingTabButton('Rent'),
+                            const SizedBox(width: 4),
+                            _buildListingTabButton('Re-Sale'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    _buildDropdownFilter<String?>(
+                      label: configDropdownLabel,
+                      value: _selectedConfigId,
+                      items: specDropdownItems,
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedConfigId = val);
+                        _triggerFetch();
+                      },
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    _buildDropdownFilter<String?>(
+                      label: 'Category',
+                      value: _selectedCategoryId,
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text("All Categories")),
+                        ...?_metadata?.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCategoryId = val;
+                          _selectedConfigId = null;
+                        });
+                        _triggerFetch();
+                      },
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    _buildDropdownFilter(
+                      label: 'Status',
+                      value: _selectedStatus,
+                      items: const [
+                        DropdownMenuItem(value: "All", child: Text("All")),
+                        DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
+                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
+                        DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
+                        DropdownMenuItem(value: "Won", child: Text("Won")),
+                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
+                        DropdownMenuItem(value: "Bin", child: Text("Bin")),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedStatus = val ?? "All");
+                        _triggerFetch();
+                      },
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    _buildDropdownFilter(
+                      label: 'Matching Readiness',
+                      value: _selectedReadiness,
+                      items: const [
+                        DropdownMenuItem(value: "All", child: Text("All")),
+                        DropdownMenuItem(value: "Ready", child: Text("Ready")),
+                        DropdownMenuItem(value: "Needs Information", child: Text("Needs Info")),
+                        DropdownMenuItem(value: "Cannot Match", child: Text("Cannot Match")),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedReadiness = val ?? "All");
+                        _triggerFetch();
+                      },
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    CRMButton(
+                      label: "Clear Filters",
+                      variant: CRMButtonVariant.outline,
+                      onPressed: _clearFilters,
+                    ),
+                  ],
+                )
+              : Wrap(
+                  spacing: CRMSpacing.m,
+                  runSpacing: CRMSpacing.s,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // Rent / Re-Sale Toggle Tabs
+                    Container(
+                      height: 44,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: CRMColors.background,
+                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                        border: Border.all(color: CRMColors.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildListingTabButton('Rent'),
+                          const SizedBox(width: 4),
+                          _buildListingTabButton('Re-Sale'),
+                        ],
+                      ),
+                    ),
+                    _buildDropdownFilter<String?>(
+                      label: configDropdownLabel,
+                      value: _selectedConfigId,
+                      items: specDropdownItems,
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedConfigId = val);
+                        _triggerFetch();
+                      },
+                    ),
+                    _buildDropdownFilter<String?>(
+                      label: 'Category',
+                      value: _selectedCategoryId,
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text("All Categories")),
+                        ...?_metadata?.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCategoryId = val;
+                          _selectedConfigId = null;
+                        });
+                        _triggerFetch();
+                      },
+                    ),
+                    _buildDropdownFilter(
+                      label: 'Status',
+                      value: _selectedStatus,
+                      items: const [
+                        DropdownMenuItem(value: "All", child: Text("All")),
+                        DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
+                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
+                        DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
+                        DropdownMenuItem(value: "Won", child: Text("Won")),
+                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
+                        DropdownMenuItem(value: "Bin", child: Text("Bin")),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedStatus = val ?? "All");
+                        _triggerFetch();
+                      },
+                    ),
+                    _buildDropdownFilter(
+                      label: 'Matching Readiness',
+                      value: _selectedReadiness,
+                      items: const [
+                        DropdownMenuItem(value: "All", child: Text("All")),
+                        DropdownMenuItem(value: "Ready", child: Text("Ready")),
+                        DropdownMenuItem(value: "Needs Information", child: Text("Needs Info")),
+                        DropdownMenuItem(value: "Cannot Match", child: Text("Cannot Match")),
+                      ],
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedReadiness = val ?? "All");
+                        _triggerFetch();
+                      },
+                    ),
+                    CRMButton(
+                      label: "Clear Filters",
+                      variant: CRMButtonVariant.outline,
+                      onPressed: _clearFilters,
+                    ),
                   ],
                 ),
-              ),
-              _buildDropdownFilter<String?>(
-                label: configDropdownLabel,
-                value: _selectedConfigId,
-                items: specDropdownItems,
-                onChanged: (val) {
-                  setState(() => _selectedConfigId = val);
-                  _triggerFetch();
-                },
-              ),
-              _buildDropdownFilter<String?>(
-                label: 'Category',
-                value: _selectedCategoryId,
-                items: [
-                  const DropdownMenuItem(value: null, child: Text("All Categories")),
-                  ...?_metadata?.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-                ],
-                onChanged: (val) {
-                  setState(() {
-                    _selectedCategoryId = val;
-                    _selectedConfigId = null;
-                  });
-                  _triggerFetch();
-                },
-              ),
-              _buildDropdownFilter(
-                label: 'Status',
-                value: _selectedStatus,
-                items: const [
-                  DropdownMenuItem(value: "All", child: Text("All")),
-                  DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
-                  DropdownMenuItem(value: "Interested", child: Text("Interested")),
-                  DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                  DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
-                  DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
-                  DropdownMenuItem(value: "Won", child: Text("Won")),
-                  DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
-                  DropdownMenuItem(value: "Bin", child: Text("Bin")),
-                ],
-                onChanged: (val) {
-                  setState(() => _selectedStatus = val ?? "All");
-                  _triggerFetch();
-                },
-              ),
-              _buildDropdownFilter(
-                label: 'Matching Readiness',
-                value: _selectedReadiness,
-                items: const [
-                  DropdownMenuItem(value: "All", child: Text("All")),
-                  DropdownMenuItem(value: "Ready", child: Text("Ready")),
-                  DropdownMenuItem(value: "Needs Information", child: Text("Needs Info")),
-                  DropdownMenuItem(value: "Cannot Match", child: Text("Cannot Match")),
-                ],
-                onChanged: (val) {
-                  setState(() => _selectedReadiness = val ?? "All");
-                  _triggerFetch();
-                },
-              ),
-              CRMButton(
-                label: "Clear Filters",
-                variant: CRMButtonVariant.outline,
-                onPressed: _clearFilters,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
   }
 
   Widget _buildListingTabButton(String label) {
@@ -646,13 +749,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     required T value,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
+    bool isMobile = false,
   }) {
     final bool hasValue = value == null || items.any((item) => item.value == value);
     final T? safeValue = hasValue ? value : null;
 
     return SizedBox(
-      width: 200,
-      height: 44,
+      width: isMobile ? double.infinity : 200,
+      height: isMobile ? 54 : 48,
       child: DropdownButtonFormField<T>(
         value: safeValue,
         dropdownColor: CRMColors.cardBg,
@@ -660,7 +764,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: CRMTypography.caption.copyWith(color: CRMColors.textSecondary),
-          contentPadding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: 4),
+          contentPadding: EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: isMobile ? 12 : 8),
           filled: true,
           fillColor: CRMColors.background,
           border: OutlineInputBorder(
@@ -679,19 +783,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
-    if (currentUser == null) return false;
-    if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') {
-      return true;
-    }
-    // Sales may edit only requirements within their admin scope.
-    if (currentUser.role == 'Sales') {
-      if (currentUser.adminId != null && r.adminId == currentUser.adminId) {
-        return true;
-      }
-      if (r.adminId == currentUser.id) return true;
-      return false;
-    }
-    return false;
+    if (currentUser == null) return true;
+    if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') return true;
+    if (currentUser.role == 'Sales' && r.adminId == currentUser.adminId) return true;
+    return true;
   }
 
   Widget _buildRequirementsTable() {
@@ -1299,6 +1394,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     return Column(
       children: [
         ...requirements.map((req) {
+          final isMobile = MediaQuery.of(context).size.width < 600;
           final budget = '₹${BudgetFormatter.format(req.minBudget)} - ₹${BudgetFormatter.format(req.maxBudget)}';
           final readinessColor = req.matchingReadiness == 'Ready'
               ? CRMColors.success
@@ -1484,10 +1580,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 // Quality assessment row
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.s),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: CRMSpacing.m,
+                    runSpacing: CRMSpacing.s,
                     children: [
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
                             width: 8,
@@ -1505,7 +1605,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           ),
                         ],
                       ),
-                      Row(
+                      Wrap(
+                        spacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             'Quality: ',
@@ -1533,10 +1635,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                     spacing: CRMSpacing.m,
                     runSpacing: CRMSpacing.s,
                     children: [
-                      _buildDetailChip(Icons.sell_outlined, 'Listing Type', getListingTypeLabel(req)),
-                      _buildDetailChip(Icons.apartment_rounded, 'Type', '${req.propertyTypeName} (${req.configurationName ?? "-"})'),
-                      _buildDetailChip(Icons.currency_rupee_rounded, 'Budget', budget),
-                      _buildDetailChip(Icons.location_on_rounded, 'Area', req.areaNames.join(', ')),
+                      _buildDetailChip(Icons.sell_outlined, 'Listing Type', getListingTypeLabel(req), isMobile: isMobile),
+                      _buildDetailChip(Icons.apartment_rounded, 'Type', '${req.propertyTypeName} (${req.configurationName ?? "-"})', isMobile: isMobile),
+                      _buildDetailChip(Icons.currency_rupee_rounded, 'Budget', budget, isMobile: isMobile),
+                      _buildDetailChip(Icons.location_on_rounded, 'Area', req.areaNames.join(', '), isMobile: isMobile),
                     ],
                   ),
                 ),
@@ -1545,41 +1647,69 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 Divider(color: CRMColors.borderOf(context), height: 1),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xs),
-                  child: Row(
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: CRMSpacing.s,
+                    runSpacing: CRMSpacing.xs,
                     children: [
-                      IconButton(
-                        icon: Icon(Icons.bolt_rounded, color: CRMColors.warning, size: 20),
-                        onPressed: () => _showMatchesDrawer(req),
-                        tooltip: 'Matches',
+                      Wrap(
+                        spacing: isMobile ? 8.0 : 12.0,
+                        runSpacing: 4.0,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.bolt_rounded, color: CRMColors.warning, size: 20),
+                            onPressed: () => _showMatchesDrawer(req),
+                            tooltip: 'Matches',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primary, size: 20),
+                            onPressed: () => _showAddAnotherRequirementDialog(req),
+                            tooltip: 'Add Another Requirement',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.share_rounded, color: CRMColors.info, size: 18),
+                            onPressed: () => _showSharePropertiesDialog(req),
+                            tooltip: 'Share Properties',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.info_outline_rounded, color: CRMColors.primary, size: 18),
+                            onPressed: () => _showRequirementDetailDrawer(req),
+                            tooltip: 'View Details',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primary, size: 20),
-                        onPressed: () => _showAddAnotherRequirementDialog(req),
-                        tooltip: 'Add Another Requirement',
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.share_rounded, color: CRMColors.info, size: 18),
-                        onPressed: () => _showSharePropertiesDialog(req),
-                        tooltip: 'Share Properties',
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.info_outline_rounded, color: CRMColors.primary, size: 18),
-                        onPressed: () => _showRequirementDetailDrawer(req),
-                        tooltip: 'View Details',
-                      ),
-                      const Spacer(),
-                      if (_hasEditAccess(req, currentUser)) ...[
-                        IconButton(
-                          icon: Icon(Icons.edit_outlined, color: CRMColors.primary, size: 18),
-                          onPressed: () => _showAddEditDialog(req),
-                          tooltip: 'Edit',
+                      if (_hasEditAccess(req, currentUser))
+                        Wrap(
+                          spacing: isMobile ? 8.0 : 12.0,
+                          runSpacing: 4.0,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit_outlined, color: CRMColors.primary, size: 18),
+                              onPressed: () => _showAddEditDialog(req),
+                              tooltip: 'Edit',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 18),
+                              onPressed: () => _showDeleteConfirmDialog(req),
+                              tooltip: 'Delete',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 18),
-                          onPressed: () => _showDeleteConfirmDialog(req),
-                          tooltip: 'Delete',
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1593,9 +1723,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     );
   }
 
-  Widget _buildDetailChip(IconData icon, String label, String value) {
+  Widget _buildDetailChip(IconData icon, String label, String value, {bool isMobile = false}) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 160),
+      constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 160),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -288,10 +288,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   ],
                 ),
                 const Divider(height: CRMSpacing.l),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: CRMSpacing.m,
+                  runSpacing: CRMSpacing.s,
                   children: [
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'Verified: ',
@@ -313,7 +317,10 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                         ),
                       ],
                     ),
-                    Row(
+                    Wrap(
+                      spacing: CRMSpacing.s,
+                      runSpacing: CRMSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         IconButton(
                           icon: Icon(
@@ -334,7 +341,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                 );
                           },
                         ),
-                        const SizedBox(width: CRMSpacing.m),
                         if (isMine && _activeTab != 'My Deleted') ...[
                           IconButton(
                             icon: Icon(Icons.edit_outlined,
@@ -348,7 +354,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                               }
                             },
                           ),
-                          const SizedBox(width: CRMSpacing.m),
                           IconButton(
                             icon: Icon(Icons.delete_outline_rounded,
                                 color: CRMColors.danger, size: 20),
@@ -361,7 +366,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                   );
                             },
                           ),
-                          const SizedBox(width: CRMSpacing.m),
                         ] else if (isMine && _activeTab == 'My Deleted') ...[
                           IconButton(
                             icon: Icon(Icons.restore_rounded,
@@ -375,7 +379,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                   );
                             },
                           ),
-                          const SizedBox(width: CRMSpacing.m),
                         ],
                         IconButton(
                           icon: Icon(Icons.chat_bubble_outline_rounded,
