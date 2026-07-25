@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'core/theme/app_theme.dart';
-import 'core/design_system/tokens/app_colors.dart';
 import 'core/design_system/tokens/app_typography.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'core/network/sync_manager.dart';
@@ -22,12 +21,13 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  late Animation<double> _opacityAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _shimmerAnimation;
   
   String _clientVersion = "1.0.0";
   String _loadingMessage = "Initializing system...";
   bool _showRetryButton = false;
-  double _progress = 0.0;
   late DateTime _startTime;
   
   final ConfigService _configService = ConfigService();
@@ -39,11 +39,40 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _startTime = DateTime.now();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 3000),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeIn,
+    
+    _opacityAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 27, // 0.0 to 0.81s (27%)
+      ),
+      TweenSequenceItem(
+        tween: ConstantTween<double>(1.0),
+        weight: 50, // 0.81s to 2.31s (50%)
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 23, // 2.31s to 3.0s (23%)
+      ),
+    ]).animate(_animationController);
+
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.94, end: 1.0).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 27,
+      ),
+      TweenSequenceItem(
+        tween: ConstantTween<double>(1.0),
+        weight: 73,
+      ),
+    ]).animate(_animationController);
+
+    _shimmerAnimation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.27, 0.77, curve: Curves.easeInOut),
+      ),
     );
     
     _animationController.forward();
@@ -60,7 +89,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     setState(() {
       _showRetryButton = false;
       _loadingMessage = "Resolving app version...";
-      _progress = 0.15;
     });
 
     // 1. Resolve dynamic client version safely
@@ -82,7 +110,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (mounted) {
       setState(() {
         _loadingMessage = "Loading application configuration...";
-        _progress = 0.35;
       });
     }
 
@@ -117,7 +144,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (mounted) {
         setState(() {
           _loadingMessage = "Checking authentication...";
-          _progress = 0.55;
         });
       }
       
@@ -130,7 +156,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() {
             _loadingMessage = "Checking legal compliance...";
-            _progress = 0.75;
           });
         }
 
@@ -158,7 +183,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() {
             _loadingMessage = "Synchronizing listings data...";
-            _progress = 0.90;
           });
         }
 
@@ -193,11 +217,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigateToHome() async {
-    if (mounted) {
-      setState(() {
-        _progress = 1.0;
-      });
-    }
     if (!mounted) return;
     await _ensureMinSplashDelay();
     if (!mounted) return;
@@ -210,11 +229,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigateToGetStarted() async {
-    if (mounted) {
-      setState(() {
-        _progress = 1.0;
-      });
-    }
     if (!mounted) return;
     await _ensureMinSplashDelay();
     if (!mounted) return;
@@ -223,7 +237,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _ensureMinSplashDelay() async {
     final elapsed = DateTime.now().difference(_startTime);
-    final minDuration = const Duration(milliseconds: 2200); // 2.2 seconds
+    final minDuration = const Duration(milliseconds: 3000); // 3.0 seconds cinematic animation
     if (elapsed < minDuration) {
       await Future.delayed(minDuration - elapsed);
     }
@@ -307,96 +321,110 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
-    final primaryColor = CRMColors.primaryOf(context);
-    final textColor = CRMColors.textOf(context);
-    final secondaryTextColor = CRMColors.textSecondaryOf(context);
+    const Color versionColor = Colors.white54;
+    const Color primaryColor = Color(0xFFD4AF37); // Classic gold
 
     return Scaffold(
-      backgroundColor: scaffoldBg,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Animated master logo
-              Hero(
-                tag: 'app_logo',
-                child: Image.asset(
-                  'assets/logo.png',
-                  width: 120,
-                  height: 120,
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    Icons.apartment_rounded,
-                    size: 100,
-                    color: primaryColor,
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Center Cinematic Logo Animation
+            Center(
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  final shimmerVal = _shimmerAnimation.value;
+                  return Opacity(
+                    opacity: _opacityAnimation.value,
+                    child: Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: ShaderMask(
+                        shaderCallback: (bounds) {
+                          return LinearGradient(
+                            begin: Alignment(shimmerVal - 1.5, shimmerVal - 1.5),
+                            end: Alignment(shimmerVal, shimmerVal),
+                            colors: const [
+                              Colors.transparent,
+                              Colors.white38,
+                              Colors.transparent,
+                            ],
+                            stops: const [0.3, 0.5, 0.7],
+                          ).createShader(bounds);
+                        },
+                        blendMode: BlendMode.srcATop,
+                        child: child,
+                      ),
+                    ),
+                  );
+                },
+                child: Hero(
+                  tag: 'app_logo',
+                  child: Image.asset(
+                    'assets/logo.png',
+                    width: 120,
+                    height: 120,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.apartment_rounded,
+                      size: 100,
+                      color: primaryColor,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'PropKart',
-                style: CRMTypography.largeDisplay.copyWith(
-                  color: textColor,
-                  letterSpacing: 2,
+            ),
+
+            // Retry UI if connection fails
+            if (_showRetryButton)
+              Positioned(
+                bottom: 80,
+                left: 40,
+                right: 40,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _loadingMessage,
+                      textAlign: TextAlign.center,
+                      style: CRMTypography.body.copyWith(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.l),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry Connection'),
+                      onPressed: _startInitializationSequence,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Version $_clientVersion',
-                style: CRMTypography.subheadline.copyWith(
-                  color: secondaryTextColor,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              // Interactive Premium Linear Progress Bar
-              Container(
-                width: 250,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: CRMColors.borderOf(context).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: _progress,
-                    backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.l),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
+
+            // Version number always at the bottom
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Align(
+                alignment: Alignment.bottomCenter,
                 child: Text(
-                  _loadingMessage,
-                  textAlign: TextAlign.center,
-                  style: CRMTypography.body.copyWith(
-                    color: secondaryTextColor,
+                  'Version $_clientVersion',
+                  style: CRMTypography.subheadline.copyWith(
+                    color: versionColor,
                     fontSize: 14,
                   ),
                 ),
               ),
-              if (_showRetryButton) ...[
-                const SizedBox(height: AppSpacing.l),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Retry Connection'),
-                  onPressed: _startInitializationSequence,
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

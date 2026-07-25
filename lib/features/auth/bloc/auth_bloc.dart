@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/user_model.dart';
 import '../repository/auth_repository.dart';
+import '../../../core/network/sync_manager.dart';
 
 // ==========================================
 // Auth Events
@@ -110,6 +111,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.password,
         event.rememberMe,
       );
+      try {
+        await SyncManager().performStartupSync();
+      } catch (syncErr) {
+        print("⚠️ [LOGIN SYNC WARNING] Startup sync failed during login: $syncErr");
+      }
       emit(Authenticated(user: user));
     } catch (e) {
       emit(AuthError(message: e.toString()));

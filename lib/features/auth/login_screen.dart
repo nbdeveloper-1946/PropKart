@@ -239,67 +239,114 @@ class _LoginScreenState extends State<LoginScreen> {
             _showErrorDialog("Login Failed", state.message);
           }
         },
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Increase breakpoint to 950 to fit 1000px container and prevent test overflows at 800px width
-              final isDesktop = constraints.maxWidth >= 950;
+        child: Stack(
+          children: [
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Increase breakpoint to 950 to fit 1000px container and prevent test overflows at 800px width
+                  final isDesktop = constraints.maxWidth >= 950;
 
-              if (isDesktop) {
-                return Center(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(CRMSpacing.l),
-                      child: SizedBox(
-                        width: 1000,
-                        height: 600,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: CRMColors.cardBgOf(context),
-                            borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-                            border: Border.all(color: CRMColors.borderOf(context), width: 1),
-                            boxShadow: CRMShadows.large,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                flex: 5,
-                                child: _buildFormContent(isDesktop: true),
+                  if (isDesktop) {
+                    return Center(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(CRMSpacing.l),
+                          child: SizedBox(
+                            width: 1000,
+                            height: 600,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: CRMColors.cardBgOf(context),
+                                borderRadius: BorderRadius.circular(CRMBorderRadius.card),
+                                border: Border.all(color: CRMColors.borderOf(context), width: 1),
+                                boxShadow: CRMShadows.large,
                               ),
-                              const Expanded(
-                                flex: 6,
-                                child: _HeroSection(),
+                              clipBehavior: Clip.antiAlias,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: _buildFormContent(isDesktop: true),
+                                  ),
+                                  const Expanded(
+                                    flex: 6,
+                                    child: _HeroSection(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Mobile Layout
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 450),
+                        decoration: BoxDecoration(
+                          color: CRMColors.cardBgOf(context),
+                          borderRadius: BorderRadius.circular(CRMBorderRadius.card),
+                          border: Border.all(color: CRMColors.borderOf(context), width: 1),
+                          boxShadow: CRMShadows.large,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _buildFormContent(isDesktop: false),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                if (state is AuthLoading) {
+                  return Container(
+                    color: Colors.black.withOpacity(0.6),
+                    child: Center(
+                      child: Card(
+                        color: CRMColors.surfaceElevatedOf(context),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(CRMBorderRadius.card),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Syncing Data...',
+                                style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Please wait while we sync listings and profile',
+                                style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: 200,
+                                child: LinearProgressIndicator(
+                                  color: CRMColors.primaryOf(context),
+                                  backgroundColor: CRMColors.borderOf(context).withOpacity(0.2),
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }
-
-              // Mobile Layout
-              return Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 450),
-                    decoration: BoxDecoration(
-                      color: CRMColors.cardBgOf(context),
-                      borderRadius: BorderRadius.circular(CRMBorderRadius.card),
-                      border: Border.all(color: CRMColors.borderOf(context), width: 1),
-                      boxShadow: CRMShadows.large,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: _buildFormContent(isDesktop: false),
-                  ),
-                ),
-              );
-            },
-          ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
         ),
       ),
     );
