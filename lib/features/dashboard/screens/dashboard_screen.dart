@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final authState = context.watch<AuthBloc>().state;
-    String userEmail = 'admin@nbdeveloper.com';
+    String userEmail = '';
     if (authState is Authenticated) {
       userEmail = authState.user.email;
     }

@@ -404,11 +404,15 @@ class SyncManager {
   Future<void> disconnect() async {
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _batchTimer?.cancel();
     _channelSubscription?.cancel();
     try {
       await _channel?.sink.close();
     } catch (_) {}
     _channel = null;
+    _incomingBuffer.clear();
+    isSyncCompleted = false;
+    isSyncing.value = false;
     _updateState(SyncState.disconnected);
   }
 

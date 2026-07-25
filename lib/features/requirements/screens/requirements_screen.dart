@@ -679,10 +679,19 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
-    if (currentUser == null) return true;
-    if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') return true;
-    if (currentUser.role == 'Sales' && r.adminId == currentUser.adminId) return true;
-    return true;
+    if (currentUser == null) return false;
+    if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') {
+      return true;
+    }
+    // Sales may edit only requirements within their admin scope.
+    if (currentUser.role == 'Sales') {
+      if (currentUser.adminId != null && r.adminId == currentUser.adminId) {
+        return true;
+      }
+      if (r.adminId == currentUser.id) return true;
+      return false;
+    }
+    return false;
   }
 
   Widget _buildRequirementsTable() {

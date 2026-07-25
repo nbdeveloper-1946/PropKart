@@ -875,11 +875,12 @@ class _CRMAppShellState extends State<CRMAppShell> {
 
   Widget _buildSidebarContent(String currentPath, {bool isMobile = false, double? sidebarWidth}) {
     final userState = context.watch<AuthBloc>().state;
-    String userEmail = 'broker@nbrealty.com';
-    String userRole = 'Agent';
-    String userFullName = 'Broker';
+    // Never invent a prior/fake identity — empty until Authenticated.
+    String userEmail = '';
+    String userRole = '';
+    String userFullName = '';
     String? userProfilePhoto;
-    
+
     if (userState is Authenticated) {
       userEmail = userState.user.email;
       userRole = userState.user.role;

@@ -15,6 +15,7 @@ import '../../../core/design_system/widgets/data_table.dart';
 import '../../../core/design_system/widgets/inputs.dart';
 import '../../../core/design_system/widgets/dialogs.dart';
 import '../../../core/api/dio_client.dart';
+import '../../../core/security/role_guard.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -344,6 +345,25 @@ class _UsersScreenState extends State<UsersScreen> {
                                 label: isEditing ? 'Save Changes' : 'Create Account',
                                 onPressed: () {
                                   if (formKey.currentState?.validate() ?? false) {
+                                    String? targetRole;
+                                    for (final r in roles) {
+                                      if (r.id == localSelectedRoleId) {
+                                        targetRole = r.name;
+                                        break;
+                                      }
+                                    }
+                                    final denial = RoleGuard.validateUserMutation(
+                                      callerRole: callerRole,
+                                      targetRoleName: targetRole ?? user?.roleName,
+                                      isDelete: false,
+                                    );
+                                    if (denial != null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(denial)),
+                                      );
+                                      return;
+                                    }
+
                                     final userData = {
                                       'full_name': nameController.text.trim(),
                                       'email': emailController.text.trim(),
@@ -386,6 +406,19 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   void _showDeleteConfirmDialog(UserModel user) async {
+    final authState = context.read<AuthBloc>().state;
+    final callerRole = authState is Authenticated ? authState.user.role : '';
+    final denial = RoleGuard.validateUserMutation(
+      callerRole: callerRole,
+      targetRoleName: user.roleName,
+      isDelete: true,
+    );
+    if (denial != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(denial)));
+      return;
+    }
+
     final confirmed = await CRMDialogs.showDeleteConfirmation(
       context,
       title: "Confirm Deletion",

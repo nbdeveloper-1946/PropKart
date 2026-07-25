@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/user_model.dart';
 import '../repository/auth_repository.dart';
 import '../../../core/network/sync_manager.dart';
+import '../../../core/storage/session_cleanup.dart';
 
 // ==========================================
 // Auth Events
@@ -32,6 +34,9 @@ class LoginSubmitted extends AuthEvent {
 }
 
 class LogoutRequested extends AuthEvent {}
+
+/// Internal: session killed by 401 / forced cleanup.
+class AuthSessionExpired extends AuthEvent {}
 
 // ==========================================
 // Auth States
@@ -72,6 +77,7 @@ class AuthError extends AuthState {
 // ==========================================
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
+  StreamSubscription<void>? _forcedLogoutSub;
 
   AuthBloc({required AuthRepository authRepository})
       : _authRepository = authRepository,
@@ -79,6 +85,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthCheckStatus>(_onAuthCheckStatus);
     on<LoginSubmitted>(_onLoginSubmitted);
     on<LogoutRequested>(_onLogoutRequested);
+    on<AuthSessionExpired>(_onSessionExpired);
+
+    _forcedLogoutSub = SessionCleanup.onForcedLogout.listen((_) {
+      if (!isClosed) add(AuthSessionExpired());
+    });
+  }
+
+  @override
+  Future<void> close() async {
+    await _forcedLogoutSub?.cancel();
+    return super.close();
   }
 
   Future<void> _onAuthCheckStatus(
@@ -88,14 +105,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final isAuth = await _authRepository.isAuthenticated();
       if (isAuth) {
-        // Retrieve fresh user details from the backend profile endpoint
         final user = await _authRepository.getProfile();
         emit(Authenticated(user: user));
       } else {
         emit(Unauthenticated());
       }
     } catch (_) {
-      // In case of invalid token / network failure, drop to unauthenticated
       emit(Unauthenticated());
     }
   }
@@ -113,8 +128,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       try {
         await SyncManager().performStartupSync();
+        SyncManager().isSyncCompleted = true;
       } catch (syncErr) {
-        print("⚠️ [LOGIN SYNC WARNING] Startup sync failed during login: $syncErr");
+        // Sync failure must not leave prior-user data; session was already cleared.
+        // Keep flag false so splash/shell force a sync before trusting local DB.
+        SyncManager().isSyncCompleted = false;
+        // ignore: avoid_print
+        print('⚠️ [LOGIN SYNC WARNING] Startup sync failed during login: $syncErr');
       }
       emit(Authenticated(user: user));
     } catch (e) {
@@ -130,6 +150,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       await _authRepository.logout();
+    } catch (_) {}
+    emit(Unauthenticated());
+  }
+
+  Future<void> _onSessionExpired(
+    AuthSessionExpired event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      await SessionCleanup.clearLocalSession(clearToken: true);
     } catch (_) {}
     emit(Unauthenticated());
   }

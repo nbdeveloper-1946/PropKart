@@ -159,8 +159,17 @@ class AppRouter {
       final onSplash = state.matchedLocation == '/splash';
       final onGetStarted = state.matchedLocation == '/get-started';
       final isPublicShare = state.matchedLocation.startsWith('/share/');
+      final onUsers = state.matchedLocation.startsWith('/users');
+      final isAuthGate = loggingIn || onSplash || onGetStarted || isPublicShare;
 
       if (authState is Authenticated) {
+        // Defense-in-depth: employee management is Admin / Super Admin only.
+        if (onUsers) {
+          final role = authState.user.role;
+          if (role != 'Admin' && role != 'Super Admin') {
+            return '/dashboard';
+          }
+        }
         if (loggingIn) {
           final from = state.uri.queryParameters['from'];
           if (from != null && from.isNotEmpty) {
@@ -178,11 +187,23 @@ class AppRouter {
           }
           return '/dashboard';
         }
-      } else if (authState is Unauthenticated) {
-        if (!loggingIn && !onSplash && !onGetStarted && !isPublicShare) {
+        return null;
+      }
+
+      // AuthInitial / AuthLoading / AuthError / Unauthenticated:
+      // never paint the authenticated shell with placeholder identity.
+      if (authState is Unauthenticated || authState is AuthError) {
+        if (!isAuthGate) {
           final target = state.uri.toString();
           return '/get-started?from=${Uri.encodeComponent(target)}';
         }
+        return null;
+      }
+
+      // AuthInitial or AuthLoading — hold on splash until auth resolves.
+      if (!isAuthGate) {
+        final target = state.uri.toString();
+        return '/splash?from=${Uri.encodeComponent(target)}';
       }
       return null;
     },
