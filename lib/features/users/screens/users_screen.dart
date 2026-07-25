@@ -851,6 +851,7 @@ class _UsersScreenState extends State<UsersScreen> {
             DataColumn(label: Text('Role')),
             DataColumn(label: Text('Email Address')),
             DataColumn(label: Text('Mobile')),
+            DataColumn(label: Text('Added By')),
             DataColumn(label: Text('Active Logins')),
             DataColumn(label: Text('Actions')),
           ],
@@ -898,6 +899,7 @@ class _UsersScreenState extends State<UsersScreen> {
                 ),
                 DataCell(Text(user.email, style: CRMTypography.body.copyWith(color: CRMColors.textSecondary))),
                 DataCell(Text(user.mobile ?? '-', style: CRMTypography.body.copyWith(color: CRMColors.textSecondary))),
+                DataCell(Text(user.createdByName ?? 'System', style: CRMTypography.body.copyWith(color: CRMColors.textSecondary))),
                 DataCell(
                   Switch(
                     value: user.isActive,
@@ -1019,27 +1021,40 @@ class _UsersScreenState extends State<UsersScreen> {
               ),
               Row(
                 children: [
+                  Icon(Icons.person_outline_rounded, size: 16, color: CRMColors.textMutedOf(context)),
+                  const SizedBox(width: 6),
                   Text(
-                    'Active Login',
-                    style: CRMTypography.body.copyWith(
-                      color: CRMColors.textSecondaryOf(context),
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(width: CRMSpacing.xs),
-                  Transform.scale(
-                    scale: 0.85,
-                    child: Switch(
-                      value: user.isActive,
-                      activeColor: CRMColors.primary,
-                      onChanged: (val) {
-                        context.read<UsersBloc>().add(
-                              ToggleUserStatusRequested(id: user.id, isActive: val),
-                            );
-                      },
-                    ),
+                    'Added by: ${user.createdByName ?? "System"}',
+                    style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
                   ),
                 ],
+              ),
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.s),
+          Divider(color: CRMColors.borderOf(context).withOpacity(0.5), height: 1),
+          const SizedBox(height: CRMSpacing.s),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Active Login',
+                style: CRMTypography.body.copyWith(
+                  color: CRMColors.textSecondaryOf(context),
+                  fontSize: 13,
+                ),
+              ),
+              Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: user.isActive,
+                  activeColor: CRMColors.primary,
+                  onChanged: (val) {
+                    context.read<UsersBloc>().add(
+                          ToggleUserStatusRequested(id: user.id, isActive: val),
+                        );
+                  },
+                ),
               ),
             ],
           ),
@@ -1528,49 +1543,112 @@ class _UsersScreenState extends State<UsersScreen> {
                       Divider(color: CRMColors.borderOf(context).withOpacity(0.5)),
                       const SizedBox(height: CRMSpacing.m),
                       
-                      // Contact info
-                      Row(
-                        children: [
-                          Icon(Icons.mail_outline_rounded, size: 16, color: CRMColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Text(user.email, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondary)),
-                        ],
-                      ),
-                      if (user.mobile != null && user.mobile!.isNotEmpty) ...[
-                        const SizedBox(height: CRMSpacing.xs),
-                        Row(
-                          children: [
-                            Icon(Icons.phone_outlined, size: 16, color: CRMColors.textSecondary),
-                            const SizedBox(width: 8),
-                            Text(user.mobile!, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondary)),
-                          ],
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Contact info
+                              Row(
+                                children: [
+                                  Icon(Icons.mail_outline_rounded, size: 16, color: CRMColors.textSecondary),
+                                  const SizedBox(width: 8),
+                                  Text(user.email, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondary)),
+                                ],
+                              ),
+                              if (user.mobile != null && user.mobile!.isNotEmpty) ...[
+                                const SizedBox(height: CRMSpacing.xs),
+                                Row(
+                                  children: [
+                                    Icon(Icons.phone_outlined, size: 16, color: CRMColors.textSecondary),
+                                    const SizedBox(width: 8),
+                                    Text(user.mobile!, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondary)),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: CRMSpacing.l),
+
+                              Text(
+                                "TEAM STATISTICS",
+                                style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondary, letterSpacing: 0.8),
+                              ),
+                              const SizedBox(height: CRMSpacing.s),
+
+                              // Metrics Grid
+                              GridView.count(
+                                crossAxisCount: 2,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisSpacing: CRMSpacing.s,
+                                mainAxisSpacing: CRMSpacing.s,
+                                childAspectRatio: 2.8,
+                                children: [
+                                  buildStatCard("Sales Created", salesCreated.toString(), Icons.group_add_rounded, CRMColors.primary),
+                                  buildStatCard("Active Sales", activeSales.toString(), Icons.check_circle_outline_rounded, CRMColors.success),
+                                  buildStatCard("Inactive Sales", inactiveSales.toString(), Icons.cancel_outlined, CRMColors.danger),
+                                  buildStatCard("Properties", propertiesAdded.toString(), Icons.home_work_outlined, CRMColors.info),
+                                ],
+                              ),
+                              const SizedBox(height: CRMSpacing.s),
+                              buildStatCard("Requirements Added", requirementsAdded.toString(), Icons.assignment_outlined, CRMColors.warning),
+                              
+                              const SizedBox(height: CRMSpacing.l),
+                              Text(
+                                "SALES REPRESENTATIVES CREATED BY THIS ADMIN",
+                                style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondary, letterSpacing: 0.8),
+                              ),
+                              const SizedBox(height: CRMSpacing.s),
+                              
+                              if (stats['salesList'] == null || (stats['salesList'] as List).isEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Text(
+                                    "No sales representatives added by this administrator yet.",
+                                    style: CRMTypography.body.copyWith(color: CRMColors.textSecondary, fontStyle: FontStyle.italic),
+                                  ),
+                                ),
+                              ] else ...[
+                                Container(
+                                  constraints: const BoxConstraints(maxHeight: 120),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.3)),
+                                    borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                                  ),
+                                  child: ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: (stats['salesList'] as List).length,
+                                    separatorBuilder: (context, index) => Divider(height: 1, color: CRMColors.borderOf(context).withOpacity(0.3)),
+                                    itemBuilder: (context, index) {
+                                      final sales = stats['salesList'][index];
+                                      final bool isActive = sales['isActive'] ?? true;
+                                      return ListTile(
+                                        dense: true,
+                                        leading: Icon(
+                                          Icons.person_rounded,
+                                          color: isActive ? CRMColors.primary : CRMColors.textMutedOf(context),
+                                          size: 16,
+                                        ),
+                                        title: Text(
+                                          sales['fullName'] ?? 'N/A',
+                                          style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context), fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Text(
+                                          sales['email'] ?? '',
+                                          style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context)),
+                                        ),
+                                        trailing: Text(
+                                          isActive ? "Active" : "Inactive",
+                                          style: CRMTypography.captionBold.copyWith(color: isActive ? CRMColors.success : CRMColors.danger),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                      ],
-                      const SizedBox(height: CRMSpacing.l),
-
-                      Text(
-                        "TEAM STATISTICS",
-                        style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondary, letterSpacing: 0.8),
                       ),
-                      const SizedBox(height: CRMSpacing.s),
-
-                      // Metrics Grid
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: CRMSpacing.s,
-                        mainAxisSpacing: CRMSpacing.s,
-                        childAspectRatio: 2.8,
-                        children: [
-                          buildStatCard("Sales Created", salesCreated.toString(), Icons.group_add_rounded, CRMColors.primary),
-                          buildStatCard("Active Sales", activeSales.toString(), Icons.check_circle_outline_rounded, CRMColors.success),
-                          buildStatCard("Inactive Sales", inactiveSales.toString(), Icons.cancel_outlined, CRMColors.danger),
-                          buildStatCard("Properties", propertiesAdded.toString(), Icons.home_work_outlined, CRMColors.info),
-                        ],
-                      ),
-                      const SizedBox(height: CRMSpacing.s),
-                      buildStatCard("Requirements Added", requirementsAdded.toString(), Icons.assignment_outlined, CRMColors.warning),
                       
                       const SizedBox(height: CRMSpacing.xl),
                       Align(

@@ -74,6 +74,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadedCreatedAt = user.createdAt;
 
       _fetchUserExtraDetails(user);
+    } else {
+      if (_fullNameController.text != user.fullName && !_isSavingDetails) {
+        _fullNameController.text = user.fullName;
+      }
+      if (_mobileController.text != (user.mobile ?? '') && !_isSavingDetails) {
+        _mobileController.text = user.mobile ?? '';
+      }
+      if (_loadedAdminName != user.adminName) {
+        _loadedAdminName = user.adminName;
+      }
+      if (_loadedAdminEmail != user.adminEmail) {
+        _loadedAdminEmail = user.adminEmail;
+      }
+      if (_loadedAdminRole != user.adminRole) {
+        _loadedAdminRole = user.adminRole;
+      }
+      if (_loadedCreatedAt != user.createdAt) {
+        _loadedCreatedAt = user.createdAt;
+      }
     }
   }
 

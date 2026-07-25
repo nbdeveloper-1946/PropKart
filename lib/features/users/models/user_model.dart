@@ -30,6 +30,7 @@ class UserModel {
   final String? createdAt;
   final String? adminId;
   final String? organizationId;
+  final String? createdByName;
 
   const UserModel({
     required this.id,
@@ -43,6 +44,7 @@ class UserModel {
     this.createdAt,
     this.adminId,
     this.organizationId,
+    this.createdByName,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,11 @@ class UserModel {
       rName = json['roles']['name'] ?? 'Sales';
     } else if (json['roleName'] != null) {
       rName = json['roleName'];
+    }
+
+    String? cName;
+    if (json['creator'] is Map) {
+      cName = json['creator']['full_name'] ?? json['creator']['fullName'];
     }
 
     return UserModel(
@@ -65,6 +72,7 @@ class UserModel {
       createdAt: json['created_at'],
       adminId: json['admin_id'] as String?,
       organizationId: json['organization_id'] as String?,
+      createdByName: cName,
     );
   }
 }

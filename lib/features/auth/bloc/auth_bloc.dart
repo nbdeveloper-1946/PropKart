@@ -121,11 +121,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final user = await _authRepository.login(
+      await _authRepository.login(
         event.email,
         event.password,
         event.rememberMe,
       );
+      final user = await _authRepository.getProfile();
       try {
         await SyncManager().performStartupSync();
         SyncManager().isSyncCompleted = true;
