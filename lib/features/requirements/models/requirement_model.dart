@@ -28,8 +28,8 @@ class RequirementModel {
   final String? assigneeName;
   final String? creatorName;
   final String? nextFollowupDate;
-  final String? furnishing;
-  final String? facing;
+  final List<String> furnishingIds;
+  final List<String> facingIds;
 
   RequirementModel({
     required this.id,
@@ -61,8 +61,8 @@ class RequirementModel {
     this.assigneeName,
     this.creatorName,
     this.nextFollowupDate,
-    this.furnishing,
-    this.facing,
+    this.furnishingIds = const [],
+    this.facingIds = const [],
   });
 
   factory RequirementModel.fromJson(Map<String, dynamic> json) {
@@ -170,8 +170,24 @@ class RequirementModel {
       assigneeName: json['assigneeName'] ?? json['assignee_name'],
       creatorName: json['creatorName'] ?? json['creator_name'],
       nextFollowupDate: json['nextFollowupDate'] ?? json['next_followup_date'],
-      furnishing: json['furnishing'] ?? json['furnishing_type_id'],
-      facing: json['facing'] ?? json['facing_type_id'],
+      furnishingIds: json['furnishingIds'] != null
+          ? List<String>.from(json['furnishingIds'])
+          : json['furnishing_type_ids'] != null
+              ? List<String>.from(json['furnishing_type_ids'])
+              : json['furnishing'] != null
+                  ? [json['furnishing'].toString()]
+                  : json['furnishing_type_id'] != null
+                      ? [json['furnishing_type_id'].toString()]
+                      : const [],
+      facingIds: json['facingIds'] != null
+          ? List<String>.from(json['facingIds'])
+          : json['facing_type_ids'] != null
+              ? List<String>.from(json['facing_type_ids'])
+              : json['facing'] != null
+                  ? [json['facing'].toString()]
+                  : json['facing_type_id'] != null
+                      ? [json['facing_type_id'].toString()]
+                      : const [],
     );
   }
 
@@ -204,8 +220,8 @@ class RequirementModel {
       'assigneeName': assigneeName,
       'creatorName': creatorName,
       'nextFollowupDate': nextFollowupDate,
-      'furnishing': furnishing,
-      'facing': facing,
+      'furnishingIds': furnishingIds,
+      'facingIds': facingIds,
     };
   }
 
@@ -229,8 +245,10 @@ class RequirementModel {
       'property_type_ids': propertyTypeIds.isNotEmpty ? propertyTypeIds : [propertyTypeId],
       'remarks': remarks,
       'status': status,
-      'furnishing_type_id': furnishing,
-      'facing_type_id': facing,
+      'furnishing_type_ids': furnishingIds,
+      'facing_type_ids': facingIds,
+      'furnishing_type_id': furnishingIds.isNotEmpty ? furnishingIds.first : null,
+      'facing_type_id': facingIds.isNotEmpty ? facingIds.first : null,
     };
   }
 
@@ -346,8 +364,8 @@ class RequirementModel {
     String? assigneeName,
     String? creatorName,
     String? nextFollowupDate,
-    String? furnishing,
-    String? facing,
+    List<String>? furnishingIds,
+    List<String>? facingIds,
   }) {
     return RequirementModel(
       id: id ?? this.id,
@@ -379,8 +397,8 @@ class RequirementModel {
       assigneeName: assigneeName ?? this.assigneeName,
       creatorName: creatorName ?? this.creatorName,
       nextFollowupDate: nextFollowupDate ?? this.nextFollowupDate,
-      furnishing: furnishing ?? this.furnishing,
-      facing: facing ?? this.facing,
+      furnishingIds: furnishingIds ?? this.furnishingIds,
+      facingIds: facingIds ?? this.facingIds,
     );
   }
 }

@@ -39,16 +39,28 @@ class DashboardRepository {
     final localReqs = await _coordinator.requirementLocal.getRequirements();
     int rentalReqs = 0;
     int resaleReqs = 0;
+    int rentalWonReqs = 0;
+    int resaleWonReqs = 0;
     for (final item in localReqs) {
       if (item.status == 'Bin') continue;
 
       final name = item.listingTypeName ?? '';
       final id = item.listingTypeId ?? '';
       final combined = '$name $id'.toLowerCase();
+      final isWon = item.status == 'Won' || item.status == 'Closed';
+
       if (combined.contains('rent')) {
-        rentalReqs++;
+        if (isWon) {
+          rentalWonReqs++;
+        } else {
+          rentalReqs++;
+        }
       } else if (combined.contains('sale') || combined.contains('resale')) {
-        resaleReqs++;
+        if (isWon) {
+          resaleWonReqs++;
+        } else {
+          resaleReqs++;
+        }
       }
     }
 
@@ -66,6 +78,8 @@ class DashboardRepository {
         resaleSold: cachedData.summary.resaleSold,
         rentalRequirements: rentalReqs,
         resaleRequirements: resaleReqs,
+        rentalWonRequirements: rentalWonReqs,
+        resaleWonRequirements: resaleWonReqs,
         totalPropertiesTrend: cachedData.summary.totalPropertiesTrend,
         availableTrend: cachedData.summary.availableTrend,
         soldTrend: cachedData.summary.soldTrend,
@@ -105,6 +119,8 @@ class DashboardRepository {
       resaleSold: model.summary.resaleSold,
       rentalRequirements: rentalReqs,
       resaleRequirements: resaleReqs,
+      rentalWonRequirements: rentalWonReqs,
+      resaleWonRequirements: resaleWonReqs,
       totalPropertiesTrend: model.summary.totalPropertiesTrend,
       availableTrend: model.summary.availableTrend,
       soldTrend: model.summary.soldTrend,

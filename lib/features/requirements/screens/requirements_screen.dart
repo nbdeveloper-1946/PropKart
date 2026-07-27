@@ -42,6 +42,8 @@ class RequirementsScreen extends StatefulWidget {
 
 class _RequirementsScreenState extends State<RequirementsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _wonSearchController = TextEditingController();
+  String? _wonCategoryId;
   String? _selectedConfigId;
   String? _selectedCategoryId;
   String _selectedStatus = "All";
@@ -396,15 +398,18 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   borderRadius: BorderRadius.circular(CRMBorderRadius.s),
                   border: Border.all(color: CRMColors.border),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildMainViewTabButton('Requirements'),
-                    const SizedBox(width: 4),
-                    _buildMainViewTabButton('Follow-ups'),
-                    const SizedBox(width: 4),
-                    _buildMainViewTabButton('My Won'),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMainViewTabButton('Requirements'),
+                      const SizedBox(width: 4),
+                      _buildMainViewTabButton('Follow-ups'),
+                      const SizedBox(width: 4),
+                      _buildMainViewTabButton('My Won'),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: CRMSpacing.l),
@@ -2156,36 +2161,96 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   Widget _buildMyWonFiltersAndTable() {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 700;
+
     final filterCard = CRMCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: CRMSpacing.m,
-            runSpacing: CRMSpacing.s,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Rent / Re-Sale Toggle Tabs
-              Container(
-                height: 44,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: CRMColors.background,
-                  borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                  border: Border.all(color: CRMColors.border),
+      child: Padding(
+        padding: const EdgeInsets.all(CRMSpacing.m),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Search field
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _wonSearchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by client name, mobile, specs, remarks...',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: 8),
+                      filled: true,
+                      fillColor: CRMColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                        borderSide: BorderSide(color: CRMColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                        borderSide: BorderSide(color: CRMColors.border),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() {});
+                    },
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildListingTabButton('Rent'),
-                    const SizedBox(width: 4),
-                    _buildListingTabButton('Re-Sale'),
+                const SizedBox(width: CRMSpacing.s),
+                CRMButton(
+                  label: "Search",
+                  onPressed: () {
+                    setState(() {});
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: CRMSpacing.m),
+
+            // Listing Type buttons and Category dropdown
+            Wrap(
+              spacing: CRMSpacing.m,
+              runSpacing: CRMSpacing.s,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                // Rent / Re-Sale Toggle Tabs
+                Container(
+                  height: 44,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: CRMColors.background,
+                    borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                    border: Border.all(color: CRMColors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildListingTabButton('Rent'),
+                      const SizedBox(width: 4),
+                      _buildListingTabButton('Re-Sale'),
+                    ],
+                  ),
+                ),
+
+                // Category dropdown filter next to it
+                _buildDropdownFilter<String?>(
+                  label: 'Category',
+                  value: _wonCategoryId,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text("All Categories")),
+                    ...?_metadata?.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
                   ],
+                  isMobile: isMobile,
+                  onChanged: (val) {
+                    setState(() {
+                      _wonCategoryId = val;
+                    });
+                  },
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
@@ -2198,13 +2263,34 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
           requirements = state.requirements.where((r) {
             final matchesListingType = getListingTypeLabel(r) == _activeListingTab;
             
+            // Category filter
+            final matchesCategory = _wonCategoryId == null || r.categoryId == _wonCategoryId;
+
+            // Search query filter
+            bool matchesSearch = true;
+            final query = _wonSearchController.text.trim().toLowerCase();
+            if (query.isNotEmpty) {
+              final name = r.clientName.toLowerCase();
+              final mobile = r.clientMobile.toLowerCase();
+              final code = r.requirementCode.toLowerCase();
+              final specs = '${r.propertyTypeName} ${r.configurationName ?? ""}'.toLowerCase();
+              final remarks = (r.remarks ?? '').toLowerCase();
+              final areas = r.areaNames.join(' ').toLowerCase();
+              matchesSearch = name.contains(query) ||
+                  mobile.contains(query) ||
+                  code.contains(query) ||
+                  specs.contains(query) ||
+                  remarks.contains(query) ||
+                  areas.contains(query);
+            }
+
             // Strictly filter for Won status
             String mappedStatus = r.status;
             if (mappedStatus == 'Closed' || mappedStatus == 'Won') mappedStatus = 'Won';
             
             final matchesStatus = mappedStatus == 'Won';
 
-            return matchesListingType && matchesStatus;
+            return matchesListingType && matchesStatus && matchesCategory && matchesSearch;
           }).toList();
           
           requirements.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -3390,18 +3476,23 @@ class _CRMRequirementDetailDrawerState extends State<_CRMRequirementDetailDrawer
 
   Widget build(BuildContext context) {
     final req = widget.requirement;
-    final furnishingName = req.furnishing != null
-        ? _furnishings.firstWhere(
-            (f) => f.id == req.furnishing,
-            orElse: () => LookupItem(id: '', name: req.furnishing!),
-          ).name
-        : '';
-    final facingName = req.facing != null
-        ? _facings.firstWhere(
-            (f) => f.id == req.facing,
-            orElse: () => LookupItem(id: '', name: req.facing!),
-          ).name
-        : '';
+    final furnishingNames = req.furnishingIds.map((id) {
+      final match = _furnishings.firstWhere(
+        (f) => f.id == id,
+        orElse: () => LookupItem(id: id, name: id),
+      );
+      return match.name;
+    }).toList();
+    final furnishingName = furnishingNames.isNotEmpty ? furnishingNames.join(', ') : '';
+
+    final facingNames = req.facingIds.map((id) {
+      final match = _facings.firstWhere(
+        (f) => f.id == id,
+        orElse: () => LookupItem(id: id, name: id),
+      );
+      return match.name;
+    }).toList();
+    final facingName = facingNames.isNotEmpty ? facingNames.join(', ') : '';
     final budget = '₹${BudgetFormatter.format(req.minBudget)} - ₹${BudgetFormatter.format(req.maxBudget)}';
     final width = MediaQuery.of(context).size.width;
     final height = MediaQuery.of(context).size.height;
@@ -3429,11 +3520,13 @@ class _CRMRequirementDetailDrawerState extends State<_CRMRequirementDetailDrawer
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "Requirement Details & Share History",
-                    style: CRMTypography.sectionTitle.copyWith(
-                      color: CRMColors.textOf(context),
-                      fontSize: isMobile ? 16 : 20,
+                  Expanded(
+                    child: Text(
+                      "Requirement Details & Share History",
+                      style: CRMTypography.sectionTitle.copyWith(
+                        color: CRMColors.textOf(context),
+                        fontSize: isMobile ? 16 : 20,
+                      ),
                     ),
                   ),
                   IconButton(

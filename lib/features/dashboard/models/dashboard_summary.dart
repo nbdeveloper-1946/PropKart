@@ -12,6 +12,8 @@ class DashboardSummary {
   final int resaleSold;
   final int rentalRequirements;
   final int resaleRequirements;
+  final int rentalWonRequirements;
+  final int resaleWonRequirements;
 
   final double totalPropertiesTrend;
   final double availableTrend;
@@ -37,6 +39,8 @@ class DashboardSummary {
     this.resaleSold = 0,
     this.rentalRequirements = 0,
     this.resaleRequirements = 0,
+    this.rentalWonRequirements = 0,
+    this.resaleWonRequirements = 0,
     this.totalPropertiesTrend = 0.0,
     this.availableTrend = 0.0,
     this.soldTrend = 0.0,
@@ -65,6 +69,8 @@ class DashboardSummary {
       resaleSold: json['resaleSold'] ?? 0,
       rentalRequirements: json['rentalRequirements'] ?? 0,
       resaleRequirements: json['resaleRequirements'] ?? 0,
+      rentalWonRequirements: json['rentalWonRequirements'] ?? 0,
+      resaleWonRequirements: json['resaleWonRequirements'] ?? 0,
       totalPropertiesTrend: (trends['totalProperties'] ?? 0.0).toDouble(),
       availableTrend: (trends['available'] ?? 0.0).toDouble(),
       soldTrend: (trends['sold'] ?? 0.0).toDouble(),

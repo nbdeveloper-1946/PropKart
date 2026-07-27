@@ -959,19 +959,15 @@ class _CRMAppShellState extends State<CRMAppShell> {
               vertical: CRMSpacing.m,
               horizontal: isExpanded ? CRMSpacing.m : CRMSpacing.xs,
             ),
-            child: Row(
-              mainAxisAlignment: isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (isMobile) {
-                      Navigator.pop(context);
-                    }
-                    if (currentPath != '/profile') {
-                      context.go('/profile');
-                    }
-                  },
-                  child: CircleAvatar(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                _showProfilePopup(context, details.globalPosition);
+              },
+              child: Row(
+                mainAxisAlignment: isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
                     backgroundColor: CRMColors.primary.withValues(alpha: 0.1),
                     backgroundImage: (userProfilePhoto != null && userProfilePhoto!.isNotEmpty)
                         ? NetworkImage(userProfilePhoto!)
@@ -980,50 +976,147 @@ class _CRMAppShellState extends State<CRMAppShell> {
                         ? null
                         : Icon(Icons.person_outline_rounded, color: CRMColors.primary),
                   ),
-                ),
-                if (isExpanded) ...[
-                  const SizedBox(width: CRMSpacing.m),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        if (isMobile) {
-                          Navigator.pop(context);
-                        }
-                        if (currentPath != '/profile') {
-                          context.go('/profile');
-                        }
-                      },
+                  if (isExpanded) ...[
+                    const SizedBox(width: CRMSpacing.m),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             displayFullName,
-                            style: CRMTypography.captionBold.copyWith(color: CRMColors.text),
+                            style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context)),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
                           Text(
                             '$displayRole • $displayEmail',
-                            style: CRMTypography.caption.copyWith(color: CRMColors.textSecondary, fontSize: 10),
+                            style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context), fontSize: 10),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.logout_rounded, color: CRMColors.danger),
-                    onPressed: _handleLogout,
-                  ),
+                    Icon(Icons.more_vert_rounded, color: CRMColors.textSecondaryOf(context), size: 18),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _showProfilePopup(BuildContext context, Offset tapPosition) {
+    final userState = context.read<AuthBloc>().state;
+    String userEmail = 'broker@nbrealty.com';
+    String userRole = 'Agent';
+    String userFullName = 'Broker';
+    String? userProfilePhoto;
+    
+    if (userState is Authenticated) {
+      userEmail = userState.user.email;
+      userRole = userState.user.role;
+      userFullName = userState.user.fullName;
+      userProfilePhoto = userState.user.profilePhoto;
+    }
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        tapPosition.dx,
+        tapPosition.dy - 120,
+        screenWidth - tapPosition.dx,
+        0,
+      ),
+      color: CRMColors.cardBgOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(CRMBorderRadius.m),
+        side: BorderSide(color: CRMColors.borderOf(context), width: 0.5),
+      ),
+      items: <PopupMenuEntry<String>>[
+        PopupMenuItem(
+          enabled: false,
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: CRMColors.primary.withValues(alpha: 0.1),
+                backgroundImage: (userProfilePhoto != null && userProfilePhoto.isNotEmpty)
+                    ? NetworkImage(userProfilePhoto)
+                    : null,
+                child: (userProfilePhoto != null && userProfilePhoto.isNotEmpty)
+                    ? null
+                    : Icon(Icons.person_outline_rounded, color: CRMColors.primary),
+              ),
+              const SizedBox(width: CRMSpacing.m),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      userFullName,
+                      style: CRMTypography.captionBold.copyWith(
+                        color: CRMColors.textOf(context),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '$userRole • $userEmail',
+                      style: CRMTypography.caption.copyWith(
+                        color: CRMColors.textSecondaryOf(context),
+                        fontSize: 10,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(Icons.person_outline_rounded, color: CRMColors.textOf(context), size: 18),
+              const SizedBox(width: CRMSpacing.s),
+              Text(
+                'My Profile',
+                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, color: CRMColors.danger, size: 18),
+              const SizedBox(width: CRMSpacing.s),
+              Text(
+                'Log Out',
+                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.danger, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'profile') {
+        final currentRoute = GoRouterState.of(context).uri.toString();
+        if (currentRoute != '/profile') {
+          context.go('/profile');
+        }
+      } else if (value == 'logout') {
+        _handleLogout();
+      }
+    });
   }
 
   Widget _buildSidebarItem(

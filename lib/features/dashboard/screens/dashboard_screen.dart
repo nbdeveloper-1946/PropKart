@@ -282,6 +282,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.assignment_turned_in_outlined,
         growthPercent: summary.requirementsTrend,
       ),
+      CRMKPICard(
+        title: 'My Won',
+        value: '${_activeTab == 'Rental' ? summary.rentalWonRequirements : summary.resaleWonRequirements}',
+        icon: Icons.emoji_events_outlined,
+        iconColor: CRMColors.success,
+        growthPercent: 0.0,
+      ),
     ];
 
     final int crossAxisCount = isDesktop ? 2 : (screenWidth >= 600 ? cards.length : 2);

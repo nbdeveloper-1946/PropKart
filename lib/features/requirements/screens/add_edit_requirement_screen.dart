@@ -45,8 +45,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   String? _selectedConfigId;
   final List<String> _selectedConfigIds = [];
   String? _selectedListingTypeId;
-  String? _selectedFurnishingId;
-  String? _selectedFacingId;
+  final List<String> _selectedFurnishingIds = [];
+  final List<String> _selectedFacingIds = [];
   String _selectedStatus = "Not Started";
   final List<String> _selectedAreaIds = [];
   String _areaSearchQuery = '';
@@ -124,8 +124,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
             _selectedConfigIds.add(req.configurationId!);
           }
           _selectedListingTypeId = req.listingTypeId;
-          _selectedFurnishingId = req.furnishing;
-          _selectedFacingId = req.facing;
+          _selectedFurnishingIds.addAll(req.furnishingIds);
+          _selectedFacingIds.addAll(req.facingIds);
           
           String statusVal = req.status;
           if (statusVal == 'Active' || statusVal == 'Live') statusVal = 'Interested';
@@ -162,8 +162,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       'remarks': _remarksController.text,
       'status': _selectedStatus,
       'areaIds': _selectedAreaIds,
-      'furnishing': _selectedFurnishingId,
-      'facing': _selectedFacingId,
+      'furnishings': _selectedFurnishingIds,
+      'facings': _selectedFacingIds,
     };
     CRMDraftRepository().saveDraft('requirement', draftData);
   }
@@ -208,8 +208,10 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
                   final List<String> areas = List<String>.from(draft['areaIds'] ?? []);
                   _selectedAreaIds.clear();
                   _selectedAreaIds.addAll(areas);
-                  _selectedFurnishingId = draft['furnishing'];
-                  _selectedFacingId = draft['facing'];
+                  _selectedFurnishingIds.clear();
+                  _selectedFurnishingIds.addAll(List<String>.from(draft['furnishings'] ?? []));
+                  _selectedFacingIds.clear();
+                  _selectedFacingIds.addAll(List<String>.from(draft['facings'] ?? []));
                 });
                 if (_pageController.hasClients) {
                   _pageController.jumpToPage(_activeStep);
@@ -451,8 +453,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       remarks: _remarksController.text.trim().isEmpty ? null : _remarksController.text.trim(),
       status: _selectedStatus,
       createdAt: widget.requirement?.createdAt ?? DateTime.now(),
-      furnishing: _selectedFurnishingId,
-      facing: _selectedFacingId,
+      furnishingIds: _selectedFurnishingIds,
+      facingIds: _selectedFacingIds,
     );
 
     _isSaved = true;
@@ -902,18 +904,18 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
             onChanged: (val) => setState(() => _selectedTypeId = val),
           ),
           const SizedBox(height: CRMSpacing.m),
-          _buildDropdown(
+          _buildMultiSelectDropdown(
             label: 'Furnishing',
-            value: _selectedFurnishingId,
-            items: _furnishings.map((f) => DropdownMenuItem(value: f.id, child: Text(f.name))).toList(),
-            onChanged: (val) => setState(() => _selectedFurnishingId = val),
+            selectedIds: _selectedFurnishingIds,
+            items: _furnishings,
+            onChanged: (vals) => setState(() {}),
           ),
           const SizedBox(height: CRMSpacing.m),
-          _buildDropdown(
+          _buildMultiSelectDropdown(
             label: 'Facing',
-            value: _selectedFacingId,
-            items: _facings.map((f) => DropdownMenuItem(value: f.id, child: Text(f.name))).toList(),
-            onChanged: (val) => setState(() => _selectedFacingId = val),
+            selectedIds: _selectedFacingIds,
+            items: _facings,
+            onChanged: (vals) => setState(() {}),
           ),
           const SizedBox(height: CRMSpacing.m),
           if (filteredConfigs.isNotEmpty) ...[
@@ -1254,6 +1256,98 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
           ),
           items: safeItems,
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMultiSelectDropdown({
+    required String label,
+    required List<String> selectedIds,
+    required List<LookupItem> items,
+    required ValueChanged<List<String>> onChanged,
+  }) {
+    final displayTexts = selectedIds.map((id) {
+      final match = items.firstWhere((item) => item.id == id, orElse: () => LookupItem(id: id, name: id));
+      return match.name;
+    }).toList();
+    final displayText = displayTexts.isNotEmpty ? displayTexts.join(', ') : 'Select $label';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context))),
+        const SizedBox(height: CRMSpacing.xs),
+        InkWell(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (dialogContext) {
+                return StatefulBuilder(
+                  builder: (ctx, setDialogState) {
+                    return AlertDialog(
+                      backgroundColor: CRMColors.cardBg,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.m)),
+                      title: Text("Select $label", style: CRMTypography.sectionTitle.copyWith(color: CRMColors.text)),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: items.map((item) {
+                            final isChecked = selectedIds.contains(item.id);
+                            return CheckboxListTile(
+                              activeColor: CRMColors.primary,
+                              title: Text(item.name, style: TextStyle(color: CRMColors.text)),
+                              value: isChecked,
+                              onChanged: (bool? checked) {
+                                setDialogState(() {
+                                  if (checked == true) {
+                                    selectedIds.add(item.id);
+                                  } else {
+                                    selectedIds.remove(item.id);
+                                  }
+                                });
+                                onChanged(List<String>.from(selectedIds));
+                                setState(() {}); // update outer widget
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      actions: [
+                        CRMButton(
+                          label: "Done",
+                          variant: CRMButtonVariant.primary,
+                          onPressed: () => Navigator.pop(dialogContext),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.s),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+              border: Border.all(color: CRMColors.borderOf(context)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    displayText,
+                    style: CRMTypography.body.copyWith(
+                      color: selectedIds.isNotEmpty ? CRMColors.textOf(context) : CRMColors.textSecondaryOf(context),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context)),
+              ],
+            ),
+          ),
         ),
       ],
     );
