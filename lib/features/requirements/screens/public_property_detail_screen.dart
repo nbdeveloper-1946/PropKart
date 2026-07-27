@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/api/api_constants.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/design_system/tokens/app_colors.dart';
 import '../../../../core/design_system/tokens/app_spacing.dart';
 import '../../../../core/design_system/tokens/app_typography.dart';
 import '../../../../core/design_system/tokens/app_shadows.dart';
-import '../../../../core/design_system/widgets/buttons.dart';
 import '../../../../core/design_system/widgets/cards.dart';
+import '../../../../core/utils/currency.dart';
 
 /// WhatsApp brand green — kept as a distinct constant for brand recognition.
 const Color _kWhatsAppGreen = Color(0xFF25D366);
@@ -146,7 +145,10 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
     final agentName = _agent?['full_name'] ?? 'Agent';
     final agentMobile = _agent?['mobile'] ?? '';
     final code = p['property_code'] ?? '';
-    final price = p['price'] != null ? '₹${p['price']}' : 'Price N/A';
+    final double? priceVal = p['price'] != null ? double.tryParse(p['price'].toString()) : null;
+    final price = priceVal != null
+        ? '${CRMCurrencyFormatter.format(priceVal)} (${CRMCurrencyFormatter.formatWords(priceVal).replaceAll('₹', '')})'
+        : 'Price N/A';
     final config = p['configuration_name'] ?? '${p['bedrooms'] ?? "-"} BHK';
     final areaName = p['area_name'] ?? '';
     final images = p['images'] as List<dynamic>? ?? [];
@@ -165,13 +167,30 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
                 itemCount: images.length,
                 onPageChanged: (index) => setState(() => _currentImageIndex = index),
                 itemBuilder: (context, index) {
-                  return Image.network(
-                    images[index].toString(),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: CRMColors.skeletonBase,
-                      child: Icon(Icons.image_not_supported_rounded, size: 64, color: CRMColors.textMuted),
-                    ),
+                  final imageUrl = images[index].toString();
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Blurred background
+                      Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                      ),
+                      // Overlay
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                      ),
+                      // Foreground contain image
+                      Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: CRMColors.skeletonBase,
+                          child: Icon(Icons.image_not_supported_rounded, size: 64, color: CRMColors.textMuted),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -203,23 +222,154 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
     }
 
     Widget buildDetailsSection() {
+      String getValue(dynamic json, String flatKey, String nestedKey, [String subKey = 'name']) {
+        if (json == null) return '';
+        if (json[flatKey] != null && json[flatKey].toString().isNotEmpty) {
+          return json[flatKey].toString();
+        }
+        if (json[nestedKey] != null && json[nestedKey] is Map && json[nestedKey][subKey] != null) {
+          return json[nestedKey][subKey].toString();
+        }
+        return '';
+      }
+
+      final List<Widget> quickSpecs = [];
+
+      final propType = getValue(p, 'property_type_name', 'property_type');
+      if (propType.isNotEmpty && propType != 'N/A') {
+        quickSpecs.add(_buildSpecItem(Icons.home_work_rounded, "Property Type", propType));
+      }
+
+      final listingType = getValue(p, 'listing_type_name', 'listing_type');
+      if (listingType.isNotEmpty && listingType != 'N/A') {
+        quickSpecs.add(_buildSpecItem(Icons.sell_rounded, "Listing Type", listingType));
+      }
+
+      final furnishing = getValue(p, 'furnishing_type_name', 'furnishing_type');
+      if (furnishing.isNotEmpty && furnishing != 'N/A') {
+        quickSpecs.add(_buildSpecItem(Icons.chair_rounded, "Furnishing", furnishing));
+      }
+
+      final facing = getValue(p, 'facing_type_name', 'facing_type');
+      if (facing.isNotEmpty && facing != 'N/A') {
+        quickSpecs.add(_buildSpecItem(Icons.explore_rounded, "Facing", facing));
+      }
+
+      final ownership = getValue(p, 'ownership_type_name', 'ownership_type');
+      if (ownership.isNotEmpty && ownership != 'N/A') {
+        quickSpecs.add(_buildSpecItem(Icons.assignment_ind_rounded, "Ownership", ownership));
+      }
+
+      final bathroomsVal = p['bathrooms'] != null ? int.tryParse(p['bathrooms'].toString()) : 0;
+      if (bathroomsVal != null && bathroomsVal > 0) {
+        quickSpecs.add(_buildSpecItem(Icons.bathtub_rounded, "Bathrooms", "$bathroomsVal"));
+      }
+
+      final balconiesVal = p['balconies'] != null ? int.tryParse(p['balconies'].toString()) : 0;
+      if (balconiesVal != null && balconiesVal > 0) {
+        quickSpecs.add(_buildSpecItem(Icons.balcony_rounded, "Balconies", "$balconiesVal"));
+      }
+
+      final parkingVal = p['parking'] != null ? int.tryParse(p['parking'].toString()) : 0;
+      if (parkingVal != null && parkingVal > 0) {
+        quickSpecs.add(_buildSpecItem(Icons.local_parking_rounded, "Parking", "$parkingVal"));
+      }
+
+      final floorNo = p['floor_no'] != null ? p['floor_no'].toString() : '';
+      final totalFloor = p['total_floor'] != null ? p['total_floor'].toString() : '';
+      if (floorNo.isNotEmpty || totalFloor.isNotEmpty) {
+        String floorText = '';
+        if (floorNo.isNotEmpty && totalFloor.isNotEmpty) {
+          floorText = "$floorNo of $totalFloor";
+        } else if (floorNo.isNotEmpty) {
+          floorText = floorNo;
+        } else {
+          floorText = "Total $totalFloor";
+        }
+        quickSpecs.add(_buildSpecItem(Icons.layers_rounded, "Floor", floorText));
+      }
+
+      final age = p['age_of_property'] != null ? p['age_of_property'].toString() : '';
+      if (age.isNotEmpty && age != '0') {
+        quickSpecs.add(_buildSpecItem(Icons.cake_rounded, "Property Age", "$age Years"));
+      }
+
+      final carpetAreaVal = p['carpet_area'] != null ? double.tryParse(p['carpet_area'].toString()) : null;
+      if (carpetAreaVal != null && carpetAreaVal > 0) {
+        quickSpecs.add(_buildSpecItem(Icons.straighten_rounded, "Carpet Area", "${carpetAreaVal.toStringAsFixed(0)} sqft"));
+      }
+
+      final plotAreaVal = p['plot_area'] != null ? double.tryParse(p['plot_area'].toString()) : null;
+      if (plotAreaVal != null && plotAreaVal > 0) {
+        quickSpecs.add(_buildSpecItem(Icons.landscape_rounded, "Plot Area", "${plotAreaVal.toStringAsFixed(0)} sqft"));
+      }
+
+      final address = p['address'] != null ? p['address'].toString() : '';
+      final landmark = p['landmark'] != null ? p['landmark'].toString() : '';
+      final pincode = p['pincode'] != null ? p['pincode'].toString() : '';
+
+      Widget? addressWidget;
+      if (address.isNotEmpty) {
+        String fullAddress = address;
+        if (landmark.isNotEmpty) fullAddress += " (Near $landmark)";
+        if (pincode.isNotEmpty) fullAddress += " - $pincode";
+        
+        addressWidget = Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(CRMSpacing.m),
+          decoration: BoxDecoration(
+            color: CRMColors.cardBgOf(context),
+            borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+            border: Border.all(color: CRMColors.borderOf(context)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.location_on_rounded, size: 22, color: CRMColors.primary),
+              const SizedBox(width: CRMSpacing.m),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Address & Location", style: CRMTypography.caption.copyWith(color: CRMColors.textMuted)),
+                    const SizedBox(height: 4),
+                    Text(
+                      fullAddress,
+                      style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      final depositVal = p['deposit'] != null ? double.tryParse(p['deposit'].toString()) : null;
+      final depositStr = (depositVal != null && depositVal > 0) ? CRMCurrencyFormatter.format(depositVal) : "₹0";
+
+      final maintenanceVal = p['maintenance'] != null ? double.tryParse(p['maintenance'].toString()) : null;
+      final maintenanceStr = (maintenanceVal != null && maintenanceVal > 0) ? CRMCurrencyFormatter.format(maintenanceVal) : "₹0";
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  "$config in $areaName",
-                  style: CRMTypography.headline.copyWith(color: CRMColors.textOf(context)),
-                ),
-              ),
-              Text(
-                price,
-                style: CRMTypography.headline.copyWith(color: CRMColors.primary),
-              ),
-            ],
+          Text(
+            "$config in $areaName",
+            style: CRMTypography.headline.copyWith(
+              color: CRMColors.textOf(context),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: CRMSpacing.xs),
+          Text(
+            price,
+            style: CRMTypography.headline.copyWith(
+              color: CRMColors.primary,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           if (society.isNotEmpty) ...[
             const SizedBox(height: CRMSpacing.xxs),
@@ -246,12 +396,40 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
           const SizedBox(height: CRMSpacing.s),
           Row(
             children: [
-              _buildPriceTag("Deposit", p['deposit'] != null ? "₹${p['deposit']}" : "N/A"),
+              _buildPriceTag("Deposit", depositStr),
               const SizedBox(width: CRMSpacing.m),
-              _buildPriceTag("Maintenance", p['maintenance'] != null ? "₹${p['maintenance']}" : "N/A"),
+              _buildPriceTag("Maintenance", maintenanceStr),
             ],
           ),
           const SizedBox(height: CRMSpacing.l),
+
+          if (quickSpecs.isNotEmpty) ...[
+            Text("Property Specifications", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
+            const SizedBox(height: CRMSpacing.s),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth >= 600 ? 3 : (constraints.maxWidth >= 380 ? 2 : 1);
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: CRMSpacing.s,
+                    mainAxisSpacing: CRMSpacing.s,
+                    childAspectRatio: 2.8,
+                  ),
+                  itemCount: quickSpecs.length,
+                  itemBuilder: (context, index) => quickSpecs[index],
+                );
+              },
+            ),
+            const SizedBox(height: CRMSpacing.l),
+          ],
+
+          if (addressWidget != null) ...[
+            addressWidget,
+            const SizedBox(height: CRMSpacing.l),
+          ],
 
           if (p['description'] != null && p['description'].toString().isNotEmpty) ...[
             Text("Description", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
@@ -449,6 +627,49 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
             Text(value, style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.text)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSpecItem(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xs),
+      decoration: BoxDecoration(
+        color: CRMColors.cardBgOf(context),
+        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+        border: Border.all(color: CRMColors.borderOf(context)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: CRMColors.primary),
+          const SizedBox(width: CRMSpacing.s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: CRMTypography.caption.copyWith(
+                    color: CRMColors.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: CRMTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: CRMColors.textOf(context),
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

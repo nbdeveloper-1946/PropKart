@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/api/api_constants.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/design_system/tokens/app_colors.dart';
 import '../../../../core/design_system/tokens/app_spacing.dart';
@@ -9,6 +8,8 @@ import '../../../../core/design_system/tokens/app_shadows.dart';
 import '../../../../core/design_system/widgets/buttons.dart';
 import '../../../../core/design_system/widgets/cards.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/utils/currency.dart';
 
 /// WhatsApp brand green — kept as a distinct constant for brand recognition.
 const Color _kWhatsAppGreen = Color(0xFF25D366);
@@ -228,12 +229,17 @@ class _SharePropertiesPageState extends State<SharePropertiesPage> {
       itemCount: _properties.length,
       itemBuilder: (context, index) {
         final p = _properties[index];
-        final price = p['price'] != null ? '₹${p['price']}' : 'Price N/A';
+        final double? priceVal = p['price'] != null ? double.tryParse(p['price'].toString()) : null;
+        final price = priceVal != null
+            ? '${CRMCurrencyFormatter.format(priceVal)} (${CRMCurrencyFormatter.formatWords(priceVal).replaceAll('₹', '')})'
+            : 'Price N/A';
         final config = p['configuration_name'] ?? '${p['bedrooms'] ?? "-"} BHK';
         final area = p['area_name'] ?? '';
         final title = '$config in $area';
         final imageUrls = p['images'] as List<dynamic>? ?? [];
         final hasImage = imageUrls.isNotEmpty;
+        final areaSqft = p['super_builtup_area'] != null ? '${p['super_builtup_area']} sqft' : '';
+        final bedrooms = p['bedrooms'] != null ? '${p['bedrooms']} BHK' : '';
 
         return Container(
           margin: const EdgeInsets.only(bottom: CRMSpacing.l),
@@ -241,57 +247,121 @@ class _SharePropertiesPageState extends State<SharePropertiesPage> {
             color: CRMColors.cardBgOf(context),
             borderRadius: BorderRadius.circular(CRMBorderRadius.l),
             border: Border.all(color: CRMColors.borderOf(context)),
-            boxShadow: CRMShadows.small,
+            boxShadow: CRMShadows.medium,
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Property Image Banner
-              SizedBox(
-                height: 200,
-                width: double.infinity,
-                child: hasImage
-                    ? Image.network(
-                        imageUrls.first.toString(),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: hasImage
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              imageUrls.first.toString(),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                            ),
+                            Container(
+                              color: Colors.black.withValues(alpha: 0.45),
+                            ),
+                            Image.network(
+                              imageUrls.first.toString(),
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: CRMColors.skeletonBase,
+                                child: Icon(Icons.image_not_supported_rounded, size: 48, color: CRMColors.textMuted),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Container(
                           color: CRMColors.skeletonBase,
-                          child: Icon(Icons.image_not_supported_rounded, size: 48, color: CRMColors.textMuted),
+                          child: Icon(Icons.image_rounded, size: 48, color: CRMColors.textMuted),
                         ),
-                      )
-                    : Container(
-                        color: CRMColors.skeletonBase,
-                        child: Icon(Icons.image_rounded, size: 48, color: CRMColors.textMuted),
-                      ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(CRMSpacing.m),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: CRMTypography.cardTitle.copyWith(color: CRMColors.textOf(context)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          price,
-                          style: CRMTypography.cardTitle.copyWith(color: CRMColors.primary),
-                        ),
-                      ],
+                    Text(
+                      title,
+                      style: CRMTypography.cardTitle.copyWith(
+                        color: CRMColors.textOf(context),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: CRMSpacing.xs),
+                    Text(
+                      price,
+                      style: CRMTypography.cardTitle.copyWith(
+                        color: CRMColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     if (p['society'] != null && p['society'].toString().isNotEmpty) ...[
                       const SizedBox(height: CRMSpacing.xxs),
                       Text(p['society'], style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
                     ],
-                    const SizedBox(height: CRMSpacing.s),
+                    const SizedBox(height: CRMSpacing.m),
+                    
+                    // Quick Specs Row
+                    Row(
+                      children: [
+                        if (bedrooms.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: CRMColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.bed_rounded, size: 14, color: CRMColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  bedrooms,
+                                  style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: CRMSpacing.s),
+                        ],
+                        if (areaSqft.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: CRMColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.square_foot_rounded, size: 14, color: CRMColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  areaSqft,
+                                  style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: CRMSpacing.m),
+                    
                     Text(
                       p['description'] ?? '',
                       style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
