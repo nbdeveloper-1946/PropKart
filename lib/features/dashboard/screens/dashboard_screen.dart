@@ -130,8 +130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 children: [
                                   _buildKPIGrids(data.summary, isDesktop: true),
                                   const SizedBox(height: CRMSpacing.l),
-                                  _buildStatusPieChart(data.summary),
-                                  const SizedBox(height: CRMSpacing.l),
                                   _buildRecentProperties(data.recentProperties),
                                 ],
                               ),
@@ -154,8 +152,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         return Column(
                           children: [
                             _buildKPIGrids(data.summary, isDesktop: false),
-                            const SizedBox(height: CRMSpacing.l),
-                            _buildStatusPieChart(data.summary),
                             const SizedBox(height: CRMSpacing.l),
                             _buildRecentProperties(data.recentProperties),
                             const SizedBox(height: CRMSpacing.l),
@@ -378,168 +374,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatusPieChart(DashboardSummary summary) {
-    final int wonCount = _activeTab == 'Rental' ? summary.rentalRented : summary.resaleSold;
-    final int liveCount = _activeTab == 'Rental' ? summary.rentalAvailable : summary.resaleAvailable;
 
-    final totalCount = wonCount + liveCount;
-    final wonPct = totalCount > 0 ? (wonCount / totalCount * 100).toStringAsFixed(1) : '0.0';
-    final livePct = totalCount > 0 ? (liveCount / totalCount * 100).toStringAsFixed(1) : '0.0';
-
-    final wonColor = CRMColors.success;
-    final liveColor = CRMColors.primary;
-    final deadColor = CRMColors.danger;
-
-    final isMobile = MediaQuery.of(context).size.width < 500;
-    final chartTooltipMsg = 'Property Breakdown:\nWon Deals: $wonCount ($wonPct%)\nLive Listings: $liveCount ($livePct%)';
-
-    final chartVisual = _buildAnimatedPieChart(
-      key: ValueKey('pie-$_activeTab-$wonCount-$liveCount'),
-      wonCount: wonCount,
-      liveCount: liveCount,
-      wonColor: wonColor,
-      liveColor: liveColor,
-      deadColor: deadColor,
-      tooltipMessage: chartTooltipMsg,
-    );
-
-    return CRMCard(
-      elevated: true,
-      title: 'Property Deals Status',
-      subtitle: 'Real-time breakdown of Won and Live property deals',
-      child: Padding(
-        padding: const EdgeInsets.only(top: CRMSpacing.m, bottom: CRMSpacing.xs),
-        child: isMobile
-            ? Column(
-                children: [
-                  chartVisual,
-                  const SizedBox(height: CRMSpacing.m),
-                  _buildPieLegend(_activeTab == 'Rental' ? 'Won Deals (Rented)' : 'Won Deals (Sale/Resale)', wonCount, '$wonPct%', wonColor),
-                  const SizedBox(height: CRMSpacing.xs),
-                  _buildPieLegend('Live Listings', liveCount, '$livePct%', liveColor),
-                ],
-              )
-            : Row(
-                children: [
-                  chartVisual,
-                  const SizedBox(width: CRMSpacing.xl),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildPieLegend(_activeTab == 'Rental' ? 'Won Deals (Rented)' : 'Won Deals (Sale/Resale)', wonCount, '$wonPct%', wonColor),
-                        const SizedBox(height: CRMSpacing.m),
-                        _buildPieLegend('Live Listings (Available)', liveCount, '$livePct%', liveColor),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildAnimatedPieChart({
-    required Key key,
-    required int wonCount,
-    required int liveCount,
-    required Color wonColor,
-    required Color liveColor,
-    required Color deadColor,
-    required String tooltipMessage,
-  }) {
-    final trackColor = CRMColors.borderOf(context).withOpacity(CRMColors.isDark ? 0.5 : 0.6);
-
-    return Tooltip(
-      message: tooltipMessage,
-      child: SizedBox(
-        height: 180,
-        width: 180,
-        child: TweenAnimationBuilder<double>(
-          key: key,
-          tween: Tween(begin: 0, end: 1),
-          duration: CRMMotion.slow,
-          curve: CRMMotion.easeOut,
-          builder: (context, progress, _) {
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                CustomPaint(
-                  size: const Size(180, 180),
-                  painter: StatusPieChartPainter(
-                    won: wonCount.toDouble(),
-                    live: liveCount.toDouble(),
-                    dead: 0,
-                    wonColor: wonColor,
-                    liveColor: liveColor,
-                    deadColor: deadColor,
-                    trackColor: trackColor,
-                    progress: progress,
-                  ),
-                ),
-                Opacity(
-                  opacity: progress,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$wonCount',
-                        style: CRMTypography.statistics.copyWith(
-                          color: CRMColors.textOf(context),
-                        ),
-                      ),
-                      Text(
-                        'Deals Won',
-                        style: CRMTypography.chartLabel.copyWith(
-                          color: CRMColors.textSecondaryOf(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPieLegend(String label, int count, String percentage, Color color) {
-    return Tooltip(
-      message: '$label: $count ($percentage)',
-      child: Row(
-        children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: CRMSpacing.s),
-          Expanded(
-            child: Text(
-              label,
-              style: CRMTypography.bodyMedium.copyWith(
-                color: CRMColors.textOf(context),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Text(
-            '$count ($percentage)',
-            style: CRMTypography.bodyMedium.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildRecentProperties(List<RecentProperty> dashboardRecentProperties) {
     final double screenWidth = MediaQuery.of(context).size.width;
