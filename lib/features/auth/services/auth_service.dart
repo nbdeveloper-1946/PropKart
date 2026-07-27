@@ -27,11 +27,16 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> refresh(String refreshToken) async {
+  /// [refreshToken] is required on mobile; on web omit so the HttpOnly cookie is used.
+  Future<Map<String, dynamic>> refresh(String? refreshToken) async {
     try {
+      final body = <String, dynamic>{};
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        body['refreshToken'] = refreshToken;
+      }
       final response = await _apiClient.post(
         ApiConstants.refresh,
-        {'refreshToken': refreshToken},
+        body,
       );
       if (response.data is Map<String, dynamic>) {
         return response.data as Map<String, dynamic>;

@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../storage/secure_storage.dart';
 import '../storage/session_cleanup.dart';
 import '../../features/auth/repository/auth_repository.dart';
+import 'dio_credentials_stub.dart'
+    if (dart.library.html) 'dio_credentials_web.dart' as credentials;
 
 class JwtInterceptor extends Interceptor {
   final SecureStorage _secureStorage = SecureStorage();
@@ -35,13 +39,30 @@ class JwtInterceptor extends Interceptor {
     return false;
   }
 
+  /// Bare client for 401 retries — credentials on, no interceptors (avoids loops).
+  Dio _retryClient(RequestOptions opts) {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: opts.baseUrl,
+        connectTimeout: opts.connectTimeout,
+        receiveTimeout: opts.receiveTimeout,
+        headers: Map<String, dynamic>.from(opts.headers),
+      ),
+    );
+    credentials.configureDioCredentials(dio);
+    return dio;
+  }
+
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
     try {
-      if (!_matchesAny(options.path, _publicPrefixes)) {
+      if (kIsWeb) {
+        options.headers['X-Auth-Transport'] = 'cookie';
+        options.headers.remove('Authorization');
+      } else if (!_matchesAny(options.path, _publicPrefixes)) {
         final token = await _secureStorage.getToken();
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
@@ -64,20 +85,19 @@ class JwtInterceptor extends Interceptor {
         try {
           final refreshed = await _authRepository.refreshSession();
           if (refreshed) {
-            final token = await _secureStorage.getToken();
             final opts = err.requestOptions;
-            opts.headers['Authorization'] = 'Bearer $token';
+            if (kIsWeb) {
+              opts.headers['X-Auth-Transport'] = 'cookie';
+              opts.headers.remove('Authorization');
+            } else {
+              final token = await _secureStorage.getToken();
+              opts.headers['Authorization'] = 'Bearer $token';
+            }
             try {
-              final clone = await Dio(
-                BaseOptions(
-                  baseUrl: opts.baseUrl,
-                  connectTimeout: opts.connectTimeout,
-                  receiveTimeout: opts.receiveTimeout,
-                ),
-              ).fetch(opts);
+              final clone = await _retryClient(opts).fetch(opts);
               _isRefreshing = false;
               return handler.resolve(clone);
-            } catch (e) {
+            } catch (_) {
               // fall through to logout
             }
           }

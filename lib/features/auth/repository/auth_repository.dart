@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/storage/session_cleanup.dart';
 import '../models/user_model.dart';
@@ -17,19 +19,23 @@ class AuthRepository {
     );
     final user = UserModel.fromJson(responseData);
 
+    if (kIsWeb) {
+      // Tokens arrive only as HttpOnly cookies — never store JWTs in JS.
+      await _secureStorage.markWebCookieSession(
+        active: true,
+        persistHint: rememberMe,
+      );
+      return user.copyWith(token: null);
+    }
+
     if (user.token == null || user.token!.isEmpty) {
       throw Exception('Login succeeded but no access token was returned.');
     }
 
     final refresh = _extractRefreshToken(responseData);
+    await _secureStorage.saveToken(user.token!, persist: rememberMe);
+    await _secureStorage.saveRefreshToken(refresh, persist: rememberMe);
 
-    // On web without remember-me: memory-only tokens (no disk persist).
-    final shouldPersist = rememberMe;
-
-    await _secureStorage.saveToken(user.token!, persist: shouldPersist);
-    await _secureStorage.saveRefreshToken(refresh, persist: shouldPersist);
-
-    // Do not keep JWT on the in-memory user model used by UI/equality.
     return user.copyWith(token: null);
   }
 
@@ -43,6 +49,19 @@ class AuthRepository {
   }
 
   Future<bool> refreshSession() async {
+    if (kIsWeb) {
+      try {
+        await _authService.refresh(null);
+        await _secureStorage.markWebCookieSession(
+          active: true,
+          persistHint: await _secureStorage.hasWebSessionHint(),
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     final refresh = await _secureStorage.getRefreshToken();
     if (refresh == null || refresh.isEmpty) return false;
     try {
@@ -68,6 +87,9 @@ class AuthRepository {
   Future<UserModel> getProfile() async {
     try {
       final responseData = await _authService.getProfile();
+      if (kIsWeb) {
+        await _secureStorage.markWebCookieSession(active: true);
+      }
       return UserModel.fromJson(responseData).copyWith(token: null);
     } catch (e) {
       await logout();
@@ -76,6 +98,14 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
+    if (kIsWeb) {
+      try {
+        await _authService.logout(refreshToken: null);
+      } catch (_) {}
+      await SessionCleanup.clearLocalSession(clearToken: true);
+      return;
+    }
+
     final refresh = await _secureStorage.getRefreshToken();
     try {
       await _authService.logout(refreshToken: refresh);
@@ -88,6 +118,29 @@ class AuthRepository {
   }
 
   Future<bool> isAuthenticated() async {
+    if (kIsWeb) {
+      // Cold start: if remember-me hint exists, probe /me with cookies.
+      if (SecureStorage.webCookieSession) return true;
+      if (await _secureStorage.hasWebSessionHint()) {
+        try {
+          await _authService.getProfile();
+          SecureStorage.webCookieSession = true;
+          return true;
+        } catch (_) {
+          await _secureStorage.markWebCookieSession(active: false);
+          return false;
+        }
+      }
+      // Session cookie may still exist without a hint — try once.
+      try {
+        await _authService.getProfile();
+        SecureStorage.webCookieSession = true;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     final token = await getSavedToken();
     return token != null && token.isNotEmpty;
   }
