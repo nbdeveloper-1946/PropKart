@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/user_model.dart';
 import '../repository/users_repository.dart';
+import '../../auth/bloc/auth_bloc.dart';
+import '../../../core/security/role_guard.dart';
 
 // Events
 abstract class UsersEvent extends Equatable {
@@ -105,10 +107,14 @@ class UsersError extends UsersState {
 // BLoC
 class UsersBloc extends Bloc<UsersEvent, UsersState> {
   final UsersRepository _usersRepository;
+  final AuthBloc? _authBloc;
   List<RoleModel> _cachedRoles = [];
 
-  UsersBloc({required UsersRepository usersRepository})
-      : _usersRepository = usersRepository,
+  UsersBloc({
+    required UsersRepository usersRepository,
+    AuthBloc? authBloc,
+  })  : _usersRepository = usersRepository,
+        _authBloc = authBloc,
         super(UsersInitial()) {
     on<FetchUsers>(_onFetchUsers);
     on<FetchRoles>(_onFetchRoles);
@@ -116,6 +122,22 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<UpdateUserRequested>(_onUpdateUser);
     on<ToggleUserStatusRequested>(_onToggleUserStatus);
     on<DeleteUserRequested>(_onDeleteUser);
+  }
+
+  String? get _callerRole {
+    final state = _authBloc?.state;
+    if (state is Authenticated) return state.user.role;
+    return null;
+  }
+
+  String? _resolveTargetRoleName(Map<String, dynamic> userData) {
+    final roleId = userData['role_id']?.toString() ?? userData['roleId']?.toString();
+    if (roleId != null && _cachedRoles.isNotEmpty) {
+      for (final r in _cachedRoles) {
+        if (r.id == roleId) return r.name;
+      }
+    }
+    return userData['role']?.toString() ?? userData['roleName']?.toString();
   }
 
   Future<void> _onFetchUsers(
@@ -153,6 +175,18 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   ) async {
     emit(UsersLoading());
     try {
+      if (_cachedRoles.isEmpty) {
+        _cachedRoles = await _usersRepository.getRoles();
+      }
+      final denial = RoleGuard.validateUserMutation(
+        callerRole: _callerRole,
+        targetRoleName: _resolveTargetRoleName(event.userData),
+        isDelete: false,
+      );
+      if (denial != null) {
+        emit(UsersError(message: denial));
+        return;
+      }
       await _usersRepository.createUser(event.userData);
       emit(const UsersOperationSuccess(message: "User created successfully."));
     } catch (e) {
@@ -166,6 +200,18 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   ) async {
     emit(UsersLoading());
     try {
+      if (_cachedRoles.isEmpty) {
+        _cachedRoles = await _usersRepository.getRoles();
+      }
+      final denial = RoleGuard.validateUserMutation(
+        callerRole: _callerRole,
+        targetRoleName: _resolveTargetRoleName(event.userData),
+        isDelete: false,
+      );
+      if (denial != null) {
+        emit(UsersError(message: denial));
+        return;
+      }
       await _usersRepository.updateUser(event.id, event.userData);
       emit(const UsersOperationSuccess(message: "User updated successfully."));
     } catch (e) {
@@ -179,6 +225,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   ) async {
     emit(UsersLoading());
     try {
+      if (!RoleGuard.canManageEmployees(_callerRole)) {
+        emit(const UsersError(message: 'You do not have permission to manage employees.'));
+        return;
+      }
       await _usersRepository.toggleUserStatus(event.id, event.isActive);
       emit(const UsersOperationSuccess(message: "User status updated."));
     } catch (e) {
@@ -192,6 +242,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   ) async {
     emit(UsersLoading());
     try {
+      if (!RoleGuard.canManageEmployees(_callerRole)) {
+        emit(const UsersError(message: 'You do not have permission to manage employees.'));
+        return;
+      }
       await _usersRepository.deleteUser(event.id);
       emit(const UsersOperationSuccess(message: "User deleted successfully."));
     } catch (e) {

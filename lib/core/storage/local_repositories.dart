@@ -189,8 +189,8 @@ class PropertyLocalRepository {
         'totalFloor': item.totalFloor,
         'ageOfProperty': item.ageOfProperty,
         'possessionDate': item.possessionDate?.toIso8601String(),
-        'ownerName': item.ownerName,
-        'ownerMobile': item.ownerMobile,
+        'ownerName': kIsWeb ? '' : item.ownerName,
+        'ownerMobile': kIsWeb ? '' : item.ownerMobile,
         'brokerName': item.brokerName,
         'remarks': item.remarks,
         'blockWing': item.blockWing,
@@ -330,8 +330,8 @@ class RequirementLocalRepository {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = inMemory.values.map((item) => jsonEncode({
         'id': item.id,
-        'clientName': item.clientName,
-        'clientMobile': item.clientMobile,
+        'clientName': kIsWeb ? '' : item.clientName,
+        'clientMobile': kIsWeb ? '' : item.clientMobile,
         'categoryId': item.categoryId,
         'categoryName': item.categoryName,
         'propertyTypeId': item.propertyTypeId,

@@ -156,7 +156,6 @@ class UserModel extends Equatable {
   List<Object?> get props => [
         id,
         email,
-        token,
         role,
         permissions,
         fullName,

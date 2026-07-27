@@ -115,18 +115,26 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
     String? configId;
     String? propTypeId;
-    if (isPropertyTypeFilter) {
-      propTypeId = _selectedConfigId;
-    } else {
-      configId = _selectedConfigId;
+    if (_activeMainTab != 'My Won') {
+      if (isPropertyTypeFilter) {
+        propTypeId = _selectedConfigId;
+      } else {
+        configId = _selectedConfigId;
+      }
     }
+
+    // My Won must load all pipeline statuses (filter Won client-side).
+    // Using the Requirements tab status filter here hid Won rows after updates.
+    final statusForFetch = _activeMainTab == 'My Won' ? 'All' : _selectedStatus;
 
     context.read<RequirementsBloc>().add(
       FetchRequirementsEvent(
-        search: _searchController.text.trim(),
+        search: _activeMainTab == 'My Won'
+            ? _wonSearchController.text.trim()
+            : _searchController.text.trim(),
         configurationId: configId,
         propertyTypeId: propTypeId,
-        status: _selectedStatus,
+        status: statusForFetch,
         listingTypeId: listingTypeId,
       ),
     );
@@ -146,28 +154,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   void _showAddEditDialog([RequirementModel? req]) {
-    if (req == null) {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => AddEditRequirementScreen(
-          requirement: null,
-          onSaved: () {
-            _triggerFetch();
-          },
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => RequirementStepperDialog(
-          requirement: req,
-          initialStep: 1, // Default directly to Step 2: Add Followup
-          onSaved: () {
-            _triggerFetch();
-          },
-        ),
-      );
-    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AddEditRequirementScreen(
+        requirement: req,
+        onSaved: () {
+          _triggerFetch();
+        },
+      ),
+    );
   }
 
   void _showDeleteConfirmDialog(RequirementModel req) {
@@ -216,19 +211,22 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
   bool _isValidStatusTransition(String currentStatus, String newStatus) {
     if (newStatus == 'Not Interested' || newStatus == 'Bin') return true;
-    
+
     // Map legacy status strings to new pipeline statuses for backward compatibility
     String mappedCurrent = currentStatus;
     if (mappedCurrent == 'Active' || mappedCurrent == 'Live') mappedCurrent = 'Interested';
     if (mappedCurrent == 'Closed' || mappedCurrent == 'Won') mappedCurrent = 'Won';
     if (mappedCurrent == 'Suspended' || mappedCurrent == 'Dead') mappedCurrent = 'Not Interested';
 
+    // From Won (My Won tab), allow moving back to any earlier pipeline stage.
+    if (mappedCurrent == 'Won') return true;
+
     final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Negotiation', 'Won'];
     final currentIndex = steps.indexOf(mappedCurrent);
     final newIndex = steps.indexOf(newStatus);
-    
+
     if (currentIndex == -1 || newIndex == -1) return true;
-    
+
     if (newIndex <= currentIndex + 1 || (mappedCurrent == 'Interested' && newStatus == 'Site Visit')) {
       return true;
     }
@@ -362,9 +360,12 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       body: BlocListener<RequirementsBloc, RequirementsState>(
         listener: (context, state) {
           if (state is RequirementsSuccess) {
+            final msg = _activeMainTab == 'My Won'
+                ? '${state.message} (My Won only shows Won items.)'
+                : state.message;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(msg),
                 backgroundColor: CRMColors.success,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -1763,6 +1764,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
         setState(() {
           _activeMainTab = label;
         });
+        // My Won needs an unfiltered status fetch so Won rows are present.
+        if (label == 'My Won' || label == 'Requirements') {
+          _triggerFetch();
+        }
       },
       child: AnimatedContainer(
         duration: CRMMotion.fast,

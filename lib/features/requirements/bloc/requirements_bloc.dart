@@ -84,7 +84,10 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     Emitter<RequirementsState> emit,
   ) async {
     _lastFetchEvent = event;
-    emit(RequirementsLoading());
+    // Avoid blanking My Won / tables when refreshing after a status change.
+    if (state is! RequirementsLoaded) {
+      emit(RequirementsLoading());
+    }
     try {
       final list = await requirementsRepository.getRequirements(
         search: event.search,
@@ -116,9 +119,21 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     UpdateRequirementEvent event,
     Emitter<RequirementsState> emit,
   ) async {
-    emit(RequirementsLoading());
     try {
-      await requirementsRepository.updateRequirement(event.requirement);
+      final updated = await requirementsRepository.updateRequirement(event.requirement);
+
+      // Optimistically patch the in-memory list so My Won status UI updates immediately.
+      if (state is RequirementsLoaded) {
+        final current = state as RequirementsLoaded;
+        final next = current.requirements.map((r) {
+          return r.id == updated.id ? updated : r;
+        }).toList();
+        final exists = current.requirements.any((r) => r.id == updated.id);
+        emit(RequirementsLoaded(
+          requirements: exists ? next : [...current.requirements, updated],
+        ));
+      }
+
       emit(RequirementsSuccess("Requirement updated successfully."));
     } catch (e) {
       emit(RequirementsError(e.toString()));

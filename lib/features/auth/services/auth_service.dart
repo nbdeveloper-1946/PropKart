@@ -6,13 +6,14 @@ import '../../../core/api/api_exception.dart';
 class AuthService {
   final ApiClient _apiClient = ApiClient();
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String email, String password, {bool rememberMe = false}) async {
     try {
       final response = await _apiClient.post(
         ApiConstants.login,
         {
           'email': email,
           'password': password,
+          'rememberMe': rememberMe,
         },
       );
       if (response.data is Map<String, dynamic>) {
@@ -23,6 +24,36 @@ class AuthService {
       throw ApiException.fromDioException(e);
     } catch (e) {
       throw ApiException(message: e.toString());
+    }
+  }
+
+  Future<Map<String, dynamic>> refresh(String refreshToken) async {
+    try {
+      final response = await _apiClient.post(
+        ApiConstants.refresh,
+        {'refreshToken': refreshToken},
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw ApiException(message: "Invalid refresh response.");
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    } catch (e) {
+      throw ApiException(message: e.toString());
+    }
+  }
+
+  Future<void> logout({String? refreshToken}) async {
+    try {
+      await _apiClient.post(
+        ApiConstants.logout,
+        {
+          if (refreshToken != null && refreshToken.isNotEmpty) 'refreshToken': refreshToken,
+        },
+      );
+    } catch (_) {
+      // Local teardown still proceeds even if server revoke fails.
     }
   }
 

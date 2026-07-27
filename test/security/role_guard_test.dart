@@ -68,5 +68,27 @@ void main() {
       expect(RoleGuard.canManageEmployees('Broker'), isFalse);
       expect(RoleGuard.canAssignAdminRole('Broker'), isFalse);
     });
+
+    test('Sales cannot view audit logs', () {
+      expect(RoleGuard.canViewAuditLogs('Sales'), isFalse);
+      expect(RoleGuard.canViewAuditLogs('Admin'), isTrue);
+    });
+
+    test('sanitizeRedirectPath blocks open redirects and privilege jumps', () {
+      expect(RoleGuard.sanitizeRedirectPath('https://evil.com'), isNull);
+      expect(RoleGuard.sanitizeRedirectPath('//evil.com'), isNull);
+      expect(
+        RoleGuard.sanitizeRedirectPath('/users', role: 'Sales'),
+        '/dashboard',
+      );
+      expect(
+        RoleGuard.sanitizeRedirectPath('/settings/audit-logs', role: 'Sales'),
+        '/dashboard',
+      );
+      expect(
+        RoleGuard.sanitizeRedirectPath('/dashboard', role: 'Sales'),
+        '/dashboard',
+      );
+    });
   });
 }

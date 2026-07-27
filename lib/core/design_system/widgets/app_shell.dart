@@ -881,9 +881,9 @@ class _CRMAppShellState extends State<CRMAppShell> {
 
   Widget _buildSidebarContent(String currentPath, {bool isMobile = false, double? sidebarWidth}) {
     final userState = context.watch<AuthBloc>().state;
-    String userEmail = 'broker@nbrealty.com';
-    String userRole = 'Agent';
-    String userFullName = 'Broker';
+    String userEmail = '';
+    String userRole = '';
+    String userFullName = '';
     String? userProfilePhoto;
     
     if (userState is Authenticated) {
@@ -891,6 +891,8 @@ class _CRMAppShellState extends State<CRMAppShell> {
       userRole = userState.user.role;
       userFullName = userState.user.fullName;
       userProfilePhoto = userState.user.profilePhoto;
+    } else {
+      return const SizedBox.shrink();
     }
 
     final isExpanded = isMobile || (sidebarWidth == null ? _isSidebarExpanded : sidebarWidth > 200.0);
@@ -1010,9 +1012,9 @@ class _CRMAppShellState extends State<CRMAppShell> {
 
   void _showProfilePopup(BuildContext context, Offset tapPosition) {
     final userState = context.read<AuthBloc>().state;
-    String userEmail = 'broker@nbrealty.com';
-    String userRole = 'Agent';
-    String userFullName = 'Broker';
+    String userEmail = '';
+    String userRole = '';
+    String userFullName = '';
     String? userProfilePhoto;
     
     if (userState is Authenticated) {
@@ -1020,6 +1022,8 @@ class _CRMAppShellState extends State<CRMAppShell> {
       userRole = userState.user.role;
       userFullName = userState.user.fullName;
       userProfilePhoto = userState.user.profilePhoto;
+    } else {
+      return;
     }
 
     final double screenWidth = MediaQuery.of(context).size.width;

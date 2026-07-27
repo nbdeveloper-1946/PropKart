@@ -97,13 +97,22 @@ class SyncManager {
   Timer? _batchTimer;
 
   Future<void> initialize() async {
+    // Realtime must only connect after authentication — call [connectAfterAuth].
+    ApiConstants.assertConfig();
+  }
+
+  /// Connect realtime only when a user session exists.
+  Future<void> connectAfterAuth() async {
+    if (!ApiConstants.hasSupabaseConfig) return;
     await connect();
   }
 
   void _updateState(SyncState newState) {
     _state = newState;
     _stateController.add(newState);
-    print("🔄 [SYNC STATE] Changed to: $newState");
+    if (kDebugMode) {
+      print("🔄 [SYNC STATE] Changed to: $newState");
+    }
   }
 
   Future<void> connect() async {
@@ -147,14 +156,26 @@ class SyncManager {
   }
 
   void _joinReplicationChannel() {
+    // Scoped tables only — never subscribe to entire public schema.
+    const watchedTables = <String>[
+      'properties',
+      'requirements',
+      'notifications',
+      'followups',
+      'site_visits',
+    ];
     _sendJson({
-      "topic": "realtime:public",
+      "topic": "realtime:propkart",
       "event": "phx_join",
       "payload": {
         "config": {
-          "postgres_changes": [
-            {"event": "*", "schema": "public"}
-          ]
+          "postgres_changes": watchedTables
+              .map((table) => {
+                    "event": "*",
+                    "schema": "public",
+                    "table": table,
+                  })
+              .toList(),
         }
       },
       "ref": (++_ref).toString()

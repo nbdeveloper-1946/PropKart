@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:propkart/core/storage/local_repositories.dart';
 import 'package:propkart/core/storage/secure_storage.dart';
 import 'package:propkart/core/storage/isar_collections.dart';
+import 'package:propkart/core/security/secure_log.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,10 +30,23 @@ void main() {
       expect(OutboxLocalRepository.inMemory, isEmpty);
     });
 
-    test('in-memory token can be wiped so next login cannot reuse it', () {
+    test('in-memory token and refresh can be wiped', () {
       SecureStorage.inMemoryToken = 'stale-jwt-from-user-a';
+      SecureStorage.inMemoryRefreshToken = 'stale-refresh';
       SecureStorage.inMemoryToken = null;
+      SecureStorage.inMemoryRefreshToken = null;
       expect(SecureStorage.inMemoryToken, isNull);
+      expect(SecureStorage.inMemoryRefreshToken, isNull);
+    });
+  });
+
+  group('SecureLog', () {
+    test('redacts bearer tokens and JWTs', () {
+      final redacted = SecureLog.redact(
+        'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.aaa.bbb',
+      );
+      expect(redacted.contains('eyJ'), isFalse);
+      expect(redacted.contains('[REDACTED]'), isTrue);
     });
   });
 }

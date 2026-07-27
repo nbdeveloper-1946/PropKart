@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/user_model.dart';
@@ -30,7 +31,7 @@ class LoginSubmitted extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [email, password, rememberMe];
+  List<Object?> get props => [email, rememberMe];
 }
 
 class LogoutRequested extends AuthEvent {}
@@ -106,6 +107,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isAuth = await _authRepository.isAuthenticated();
       if (isAuth) {
         final user = await _authRepository.getProfile();
+        try {
+          await SyncManager().connectAfterAuth();
+        } catch (_) {}
         emit(Authenticated(user: user));
       } else {
         emit(Unauthenticated());
@@ -130,12 +134,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       try {
         await SyncManager().performStartupSync();
         SyncManager().isSyncCompleted = true;
+        // Realtime only after authenticated sync.
+        await SyncManager().connectAfterAuth();
       } catch (syncErr) {
-        // Sync failure must not leave prior-user data; session was already cleared.
-        // Keep flag false so splash/shell force a sync before trusting local DB.
         SyncManager().isSyncCompleted = false;
-        // ignore: avoid_print
-        print('⚠️ [LOGIN SYNC WARNING] Startup sync failed during login: $syncErr');
+        if (kDebugMode) {
+          // ignore: avoid_print
+          print('⚠️ [LOGIN SYNC WARNING] Startup sync failed during login');
+        }
       }
       emit(Authenticated(user: user));
     } catch (e) {

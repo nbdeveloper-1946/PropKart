@@ -26,6 +26,7 @@ import '../../features/properties/screens/recycle_bin_screen.dart';
 import '../network/sync_manager.dart';
 import '../../features/requirements/screens/share_properties_page.dart';
 import '../../features/requirements/screens/public_property_detail_screen.dart';
+import '../security/role_guard.dart';
 
 
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -160,49 +161,43 @@ class AppRouter {
       final onGetStarted = state.matchedLocation == '/get-started';
       final isPublicShare = state.matchedLocation.startsWith('/share/');
       final onUsers = state.matchedLocation.startsWith('/users');
+      final onAudit = state.matchedLocation.startsWith('/settings/audit-logs');
       final isAuthGate = loggingIn || onSplash || onGetStarted || isPublicShare;
 
       if (authState is Authenticated) {
-        // Defense-in-depth: employee management is Admin / Super Admin only.
-        if (onUsers) {
-          final role = authState.user.role;
-          if (role != 'Admin' && role != 'Super Admin') {
-            return '/dashboard';
-          }
+        final role = authState.user.role;
+
+        if (onUsers && !RoleGuard.canManageEmployees(role)) {
+          return '/dashboard';
         }
+        if (onAudit && !RoleGuard.canViewAuditLogs(role)) {
+          return '/dashboard';
+        }
+
         if (loggingIn) {
           final from = state.uri.queryParameters['from'];
-          if (from != null && from.isNotEmpty) {
-            return Uri.decodeComponent(from);
-          }
-          return '/dashboard';
+          return RoleGuard.sanitizeRedirectPath(from, role: role) ?? '/dashboard';
         }
         if (onSplash) {
           if (!SyncManager().isSyncCompleted) {
-            return null; // Stay on splash screen until sync completes
+            return null;
           }
           final from = state.uri.queryParameters['from'];
-          if (from != null && from.isNotEmpty) {
-            return Uri.decodeComponent(from);
-          }
-          return '/dashboard';
+          return RoleGuard.sanitizeRedirectPath(from, role: role) ?? '/dashboard';
         }
         return null;
       }
 
-      // AuthInitial / AuthLoading / AuthError / Unauthenticated:
-      // never paint the authenticated shell with placeholder identity.
       if (authState is Unauthenticated || authState is AuthError) {
         if (!isAuthGate) {
-          final target = state.uri.toString();
+          final target = state.matchedLocation;
           return '/get-started?from=${Uri.encodeComponent(target)}';
         }
         return null;
       }
 
-      // AuthInitial or AuthLoading — hold on splash until auth resolves.
       if (!isAuthGate) {
-        final target = state.uri.toString();
+        final target = state.matchedLocation;
         return '/splash?from=${Uri.encodeComponent(target)}';
       }
       return null;

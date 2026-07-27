@@ -33,6 +33,7 @@ void main() async {
   try {
     await IsarService().initialize();
     await PerformanceLogger().initialize();
+    // Do NOT connect Supabase Realtime before login — auth gates sync.
     await SyncManager().initialize();
 
     final lookupCount = await RepositoryCoordinator().lookupLocal.getLookupsCount();
@@ -91,6 +92,7 @@ class _MyAppState extends State<MyApp> {
           BlocProvider(
             create: (context) => UsersBloc(
               usersRepository: context.read<UsersRepository>(),
+              authBloc: context.read<AuthBloc>(),
             ),
           ),
           BlocProvider(
