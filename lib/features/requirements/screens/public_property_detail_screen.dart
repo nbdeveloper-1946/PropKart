@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/design_system/tokens/app_colors.dart';
@@ -31,11 +32,18 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
   Map<String, dynamic>? _agent;
   Map<String, dynamic>? _property;
   int _currentImageIndex = 0;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
     super.initState();
     _loadPropertyDetails();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPropertyDetails() async {
@@ -164,6 +172,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
               height: height,
               width: double.infinity,
               child: PageView.builder(
+                controller: _pageController,
                 itemCount: images.length,
                 onPageChanged: (index) => setState(() => _currentImageIndex = index),
                 itemBuilder: (context, index) {
@@ -195,6 +204,58 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
                 },
               ),
             ),
+            if (images.length > 1) ...[
+              // Left Arrow Button
+              if (_currentImageIndex > 0)
+                Positioned(
+                  left: CRMSpacing.s,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.white),
+                        onPressed: () {
+                          _pageController.animateToPage(
+                            _currentImageIndex - 1,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              // Right Arrow Button
+              if (_currentImageIndex < images.length - 1)
+                Positioned(
+                  right: CRMSpacing.s,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.white),
+                        onPressed: () {
+                          _pageController.animateToPage(
+                            _currentImageIndex + 1,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+            ],
             Positioned(
               bottom: CRMSpacing.s,
               child: Container(
@@ -222,134 +283,193 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
     }
 
     Widget buildDetailsSection() {
-      String getValue(dynamic json, String flatKey, String nestedKey, [String subKey = 'name']) {
+      String getValue(dynamic json, String key) {
         if (json == null) return '';
-        if (json[flatKey] != null && json[flatKey].toString().isNotEmpty) {
-          return json[flatKey].toString();
-        }
-        if (json[nestedKey] != null && json[nestedKey] is Map && json[nestedKey][subKey] != null) {
-          return json[nestedKey][subKey].toString();
+        if (json[key] != null && json[key].toString().isNotEmpty) {
+          return json[key].toString();
         }
         return '';
       }
 
-      final List<Widget> quickSpecs = [];
-
-      final propType = getValue(p, 'property_type_name', 'property_type');
-      if (propType.isNotEmpty && propType != 'N/A') {
-        quickSpecs.add(_buildSpecItem(Icons.home_work_rounded, "Property Type", propType));
-      }
-
-      final listingType = getValue(p, 'listing_type_name', 'listing_type');
+      // 1. Basic Details Items
+      final List<_DetailItem> basicItems = [];
+      
+      final listingType = getValue(p, 'listing_type_name');
       if (listingType.isNotEmpty && listingType != 'N/A') {
-        quickSpecs.add(_buildSpecItem(Icons.sell_rounded, "Listing Type", listingType));
+        basicItems.add(_DetailItem('Listing Type', listingType, Icons.sell_outlined));
       }
-
-      final furnishing = getValue(p, 'furnishing_type_name', 'furnishing_type');
-      if (furnishing.isNotEmpty && furnishing != 'N/A') {
-        quickSpecs.add(_buildSpecItem(Icons.chair_rounded, "Furnishing", furnishing));
+      
+      final category = getValue(p, 'category_name');
+      if (category.isNotEmpty && category != 'N/A') {
+        basicItems.add(_DetailItem('Category', category, Icons.category_outlined));
       }
-
-      final facing = getValue(p, 'facing_type_name', 'facing_type');
-      if (facing.isNotEmpty && facing != 'N/A') {
-        quickSpecs.add(_buildSpecItem(Icons.explore_rounded, "Facing", facing));
+      
+      final propType = getValue(p, 'property_type_name');
+      if (propType.isNotEmpty && propType != 'N/A') {
+        basicItems.add(_DetailItem('Property Type', propType, Icons.home_work_outlined));
       }
-
-      final ownership = getValue(p, 'ownership_type_name', 'ownership_type');
-      if (ownership.isNotEmpty && ownership != 'N/A') {
-        quickSpecs.add(_buildSpecItem(Icons.assignment_ind_rounded, "Ownership", ownership));
+      
+      final configName = getValue(p, 'configuration_name');
+      if (configName.isNotEmpty && configName != 'N/A') {
+        basicItems.add(_DetailItem('Configuration', configName, Icons.dashboard_outlined));
       }
+      
+      final status = getValue(p, 'property_status_name');
+      if (status.isNotEmpty && status != 'N/A') {
+        basicItems.add(_DetailItem('Status', status, Icons.info_outline));
+      }
+      
+      basicItems.add(_DetailItem('Price', price, Icons.monetization_on_outlined));
+      
+      final maintenanceVal = p['maintenance'] != null ? double.tryParse(p['maintenance'].toString()) : null;
+      final maintenanceStr = (maintenanceVal != null && maintenanceVal > 0) ? CRMCurrencyFormatter.format(maintenanceVal) : "₹0";
+      basicItems.add(_DetailItem('Maintenance', '$maintenanceStr/mo', Icons.build_circle_outlined));
+      
+      final isVerified = p['is_verified'] == true;
+      basicItems.add(_DetailItem('Verification', isVerified ? 'Verified' : 'Pending Verification', Icons.verified_outlined));
 
+      // 2. Specifications & Floor Details Items
+      final List<_DetailItem> specsItems = [];
+      
+      final bedroomsVal = p['bedrooms'] != null ? int.tryParse(p['bedrooms'].toString()) : 0;
+      if (bedroomsVal != null && bedroomsVal > 0) {
+        specsItems.add(_DetailItem('Bedrooms', '$bedroomsVal BHK', Icons.king_bed_outlined));
+      }
+      
       final bathroomsVal = p['bathrooms'] != null ? int.tryParse(p['bathrooms'].toString()) : 0;
       if (bathroomsVal != null && bathroomsVal > 0) {
-        quickSpecs.add(_buildSpecItem(Icons.bathtub_rounded, "Bathrooms", "$bathroomsVal"));
+        specsItems.add(_DetailItem('Bathrooms', '$bathroomsVal', Icons.bathtub_outlined));
       }
-
+      
       final balconiesVal = p['balconies'] != null ? int.tryParse(p['balconies'].toString()) : 0;
       if (balconiesVal != null && balconiesVal > 0) {
-        quickSpecs.add(_buildSpecItem(Icons.balcony_rounded, "Balconies", "$balconiesVal"));
+        specsItems.add(_DetailItem('Balconies', '$balconiesVal', Icons.balcony_outlined));
       }
-
-      final parkingVal = p['parking'] != null ? int.tryParse(p['parking'].toString()) : 0;
-      if (parkingVal != null && parkingVal > 0) {
-        quickSpecs.add(_buildSpecItem(Icons.local_parking_rounded, "Parking", "$parkingVal"));
-      }
-
+      
       final floorNo = p['floor_no'] != null ? p['floor_no'].toString() : '';
       final totalFloor = p['total_floor'] != null ? p['total_floor'].toString() : '';
       if (floorNo.isNotEmpty || totalFloor.isNotEmpty) {
-        String floorText = '';
+        String floorStr = '';
         if (floorNo.isNotEmpty && totalFloor.isNotEmpty) {
-          floorText = "$floorNo of $totalFloor";
+          floorStr = '$floorNo / $totalFloor';
         } else if (floorNo.isNotEmpty) {
-          floorText = floorNo;
+          floorStr = floorNo;
         } else {
-          floorText = "Total $totalFloor";
+          floorStr = 'Total: $totalFloor';
         }
-        quickSpecs.add(_buildSpecItem(Icons.layers_rounded, "Floor", floorText));
+        specsItems.add(_DetailItem('Floor', floorStr, Icons.layers_outlined));
       }
-
-      final age = p['age_of_property'] != null ? p['age_of_property'].toString() : '';
-      if (age.isNotEmpty && age != '0') {
-        quickSpecs.add(_buildSpecItem(Icons.cake_rounded, "Property Age", "$age Years"));
+      
+      final ageVal = p['age_of_property'] != null ? int.tryParse(p['age_of_property'].toString()) : 0;
+      if (ageVal != null && ageVal > 0) {
+        String ageDisplay = '';
+        if (ageVal <= 1) {
+          ageDisplay = '0 to 1 years';
+        } else if (ageVal <= 5) {
+          ageDisplay = '1 to 5 years';
+        } else if (ageVal <= 10) {
+          ageDisplay = '5 to 10 years';
+        } else if (ageVal <= 14) {
+          ageDisplay = '10+ years';
+        } else if (ageVal <= 19) {
+          ageDisplay = '15+ years';
+        } else {
+          ageDisplay = '20+ years';
+        }
+        specsItems.add(_DetailItem('Property Age', ageDisplay, Icons.hourglass_empty_rounded));
       }
-
-      final carpetAreaVal = p['carpet_area'] != null ? double.tryParse(p['carpet_area'].toString()) : null;
+      
+      final superAreaVal = p['super_builtup_area'] != null ? double.tryParse(p['super_builtup_area'].toString()) : 0;
+      if (superAreaVal != null && superAreaVal > 0) {
+        specsItems.add(_DetailItem('Super Built-up Area', '${superAreaVal.toStringAsFixed(0)} Sq. Ft.', Icons.square_foot_outlined));
+      }
+      
+      final carpetAreaVal = p['carpet_area'] != null ? double.tryParse(p['carpet_area'].toString()) : 0;
       if (carpetAreaVal != null && carpetAreaVal > 0) {
-        quickSpecs.add(_buildSpecItem(Icons.straighten_rounded, "Carpet Area", "${carpetAreaVal.toStringAsFixed(0)} sqft"));
+        specsItems.add(_DetailItem('Carpet Area', '${carpetAreaVal.toStringAsFixed(0)} Sq. Ft.', Icons.aspect_ratio_rounded));
       }
-
-      final plotAreaVal = p['plot_area'] != null ? double.tryParse(p['plot_area'].toString()) : null;
+      
+      final plotAreaVal = p['plot_area'] != null ? double.tryParse(p['plot_area'].toString()) : 0;
       if (plotAreaVal != null && plotAreaVal > 0) {
-        quickSpecs.add(_buildSpecItem(Icons.landscape_rounded, "Plot Area", "${plotAreaVal.toStringAsFixed(0)} sqft"));
+        specsItems.add(_DetailItem('Plot Area', '${plotAreaVal.toStringAsFixed(0)} Sq. Yds.', Icons.terrain_outlined));
+      }
+      
+      final furnishing = getValue(p, 'furnishing_type_name');
+      if (furnishing.isNotEmpty && furnishing != 'N/A') {
+        specsItems.add(_DetailItem('Furnishing', furnishing, Icons.chair_outlined));
+      }
+      
+      final facing = getValue(p, 'facing_type_name');
+      if (facing.isNotEmpty && facing != 'N/A') {
+        specsItems.add(_DetailItem('Facing', facing, Icons.compass_calibration_outlined));
+      }
+      
+      if (p['possession_date'] != null) {
+        try {
+          final posDate = DateTime.tryParse(p['possession_date'].toString());
+          if (posDate != null) {
+            specsItems.add(_DetailItem('Possession Date', DateFormat('dd-MM-yyyy').format(posDate), Icons.event_available_rounded));
+          }
+        } catch (_) {}
+      }
+      
+      final parkingVal = p['parking'] != null ? int.tryParse(p['parking'].toString()) : 0;
+      if (parkingVal != null && parkingVal > 0) {
+        specsItems.add(_DetailItem('Parking', _getParkingDisplay(parkingVal), Icons.local_parking_rounded));
       }
 
-      final address = p['address'] != null ? p['address'].toString() : '';
-      final landmark = p['landmark'] != null ? p['landmark'].toString() : '';
-      final pincode = p['pincode'] != null ? p['pincode'].toString() : '';
-
-      Widget? addressWidget;
+      // 3. Location & Address Items
+      final List<_DetailItem> locationItems = [];
+      
+      final city = getValue(p, 'city_name');
+      if (city.isNotEmpty) {
+        locationItems.add(_DetailItem('City', city, Icons.location_city_outlined));
+      }
+      
+      if (areaName.isNotEmpty) {
+        locationItems.add(_DetailItem('Area', areaName, Icons.map_outlined));
+      }
+      
+      final pincode = getValue(p, 'pincode');
+      if (pincode.isNotEmpty) {
+        locationItems.add(_DetailItem('Pincode', pincode, Icons.pin_drop_outlined));
+      }
+      
+      final landmark = getValue(p, 'landmark');
+      if (landmark.isNotEmpty) {
+        locationItems.add(_DetailItem('Landmark', landmark, Icons.landscape_outlined));
+      }
+      
+      final blockWing = p['block_wing'] != null ? p['block_wing'].toString() : '';
+      if (blockWing.isNotEmpty) {
+        locationItems.add(_DetailItem('Block/Wing', blockWing, Icons.domain_outlined));
+      }
+      
+      final flatNo = p['flat_no'] != null ? p['flat_no'].toString() : '';
+      if (flatNo.isNotEmpty) {
+        locationItems.add(_DetailItem('Flat/Plot No.', flatNo, Icons.tag_rounded));
+      }
+      
+      final address = getValue(p, 'address');
       if (address.isNotEmpty) {
-        String fullAddress = address;
-        if (landmark.isNotEmpty) fullAddress += " (Near $landmark)";
-        if (pincode.isNotEmpty) fullAddress += " - $pincode";
-        
-        addressWidget = Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(CRMSpacing.m),
-          decoration: BoxDecoration(
-            color: CRMColors.cardBgOf(context),
-            borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-            border: Border.all(color: CRMColors.borderOf(context)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.location_on_rounded, size: 22, color: CRMColors.primary),
-              const SizedBox(width: CRMSpacing.m),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Address & Location", style: CRMTypography.caption.copyWith(color: CRMColors.textMuted)),
-                    const SizedBox(height: 4),
-                    Text(
-                      fullAddress,
-                      style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
+        locationItems.add(_DetailItem('Address', address, Icons.home_outlined));
+      }
+
+      // 4. Key Details Items
+      final List<_DetailItem> contactsItems = [];
+      
+      final ownership = getValue(p, 'ownership_type_name');
+      if (ownership.isNotEmpty) {
+        contactsItems.add(_DetailItem('Ownership', ownership, Icons.badge_outlined));
+      }
+      
+      final brokerageType = getValue(p, 'brokerage_type_name');
+      if (brokerageType.isNotEmpty) {
+        contactsItems.add(_DetailItem('Brokerage Type', brokerageType, Icons.percent_rounded));
       }
 
       final depositVal = p['deposit'] != null ? double.tryParse(p['deposit'].toString()) : null;
       final depositStr = (depositVal != null && depositVal > 0) ? CRMCurrencyFormatter.format(depositVal) : "₹0";
-
-      final maintenanceVal = p['maintenance'] != null ? double.tryParse(p['maintenance'].toString()) : null;
-      final maintenanceStr = (maintenanceVal != null && maintenanceVal > 0) ? CRMCurrencyFormatter.format(maintenanceVal) : "₹0";
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +503,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildDetailColumn(Icons.bed_rounded, "Bedrooms", "${p['bedrooms'] ?? '-'}"),
+                  _buildDetailColumn(Icons.bed_rounded, "Bedrooms", "${p['bedrooms'] ?? '-'} BHK"),
                   _buildDetailColumn(Icons.square_foot_rounded, "Area", p['super_builtup_area'] != null ? "${p['super_builtup_area']} sqft" : "-"),
                   _buildDetailColumn(Icons.event_available_rounded, "Available From", p['available_from'] ?? "Immediate"),
                 ],
@@ -398,36 +518,32 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
             children: [
               _buildPriceTag("Deposit", depositStr),
               const SizedBox(width: CRMSpacing.m),
-              _buildPriceTag("Maintenance", maintenanceStr),
+              _buildPriceTag("Maintenance", "$maintenanceStr/mo"),
             ],
           ),
           const SizedBox(height: CRMSpacing.l),
 
-          if (quickSpecs.isNotEmpty) ...[
-            Text("Property Specifications", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
-            const SizedBox(height: CRMSpacing.s),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth >= 600 ? 3 : (constraints.maxWidth >= 380 ? 2 : 1);
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: CRMSpacing.s,
-                    mainAxisSpacing: CRMSpacing.s,
-                    childAspectRatio: 2.8,
-                  ),
-                  itemCount: quickSpecs.length,
-                  itemBuilder: (context, index) => quickSpecs[index],
-                );
-              },
-            ),
+          // Render Basic Details Card
+          if (basicItems.isNotEmpty) ...[
+            _buildResponsiveDetailCard('Basic Details', basicItems),
             const SizedBox(height: CRMSpacing.l),
           ],
 
-          if (addressWidget != null) ...[
-            addressWidget,
+          // Render Specifications & Floor Details Card
+          if (specsItems.isNotEmpty) ...[
+            _buildResponsiveDetailCard('Specifications & Floor Details', specsItems),
+            const SizedBox(height: CRMSpacing.l),
+          ],
+
+          // Render Location & Address Card
+          if (locationItems.isNotEmpty) ...[
+            _buildResponsiveDetailCard('Location & Address', locationItems),
+            const SizedBox(height: CRMSpacing.l),
+          ],
+
+          // Render Key Details Card
+          if (contactsItems.isNotEmpty) ...[
+            _buildResponsiveDetailCard('Contacts & Key Management', contactsItems),
             const SizedBox(height: CRMSpacing.l),
           ],
 
@@ -605,7 +721,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
         Icon(icon, size: 24, color: CRMColors.primary),
         const SizedBox(height: CRMSpacing.xxs),
         Text(label, style: CRMTypography.caption.copyWith(color: CRMColors.textMuted)),
-        Text(value, style: CRMTypography.captionBold.copyWith(color: CRMColors.text)),
+        Text(value, style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
       ],
     );
   }
@@ -624,53 +740,103 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
           children: [
             Text(label, style: CRMTypography.caption.copyWith(color: CRMColors.textMuted)),
             const SizedBox(height: 2),
-            Text(value, style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.text)),
+            Text(value, style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSpecItem(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xs),
-      decoration: BoxDecoration(
-        color: CRMColors.cardBgOf(context),
-        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-        border: Border.all(color: CRMColors.borderOf(context)),
-      ),
+  String _getParkingDisplay(int parkingVal) {
+    if (parkingVal >= 11) {
+      final optIndex = parkingVal ~/ 10;
+      final slotVal = parkingVal % 10;
+      String option = 'Basement 1';
+      if (optIndex == 1) {
+        option = 'Basement 1';
+      } else if (optIndex == 2) {
+        option = 'Basement 2';
+      } else if (optIndex == 3) {
+        option = 'Ground Floor';
+      }
+      return 'Allocated - $option (Slot $slotVal)';
+    } else if (parkingVal == 1) {
+      return 'Allocated - Basement 1';
+    } else if (parkingVal == 2) {
+      return 'Allocated - Ground Floor';
+    } else if (parkingVal == 3) {
+      return 'Allocated';
+    } else {
+      return 'Open';
+    }
+  }
+
+  Widget _buildResponsiveDetailCard(String title, List<_DetailItem> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final int cols = constraints.maxWidth > 500 ? 2 : 1;
+        final double itemWidth = cols == 2 ? (constraints.maxWidth - CRMSpacing.m) / 2 : constraints.maxWidth;
+
+        return CRMCard(
+          padding: const EdgeInsets.all(CRMSpacing.m),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.primaryOf(context), fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: CRMSpacing.s),
+              Divider(color: CRMColors.borderOf(context).withOpacity(0.6), thickness: 0.5),
+              const SizedBox(height: CRMSpacing.s),
+              Wrap(
+                spacing: CRMSpacing.m,
+                runSpacing: CRMSpacing.s,
+                children: items.map((item) {
+                  return SizedBox(
+                    width: itemWidth,
+                    child: _buildDetailRow(item.label, item.value, item.icon),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: CRMColors.primary),
-          const SizedBox(width: CRMSpacing.s),
+          Icon(icon, size: 16, color: CRMColors.textSecondaryOf(context)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
+          ),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: CRMTypography.caption.copyWith(
-                    color: CRMColors.textMuted,
-                    fontSize: 10,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: CRMTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: CRMColors.textOf(context),
-                    fontSize: 12,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: CRMTypography.body.copyWith(color: CRMColors.textOf(context), fontWeight: FontWeight.w600),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _DetailItem {
+  final String label;
+  final String value;
+  final IconData icon;
+  _DetailItem(this.label, this.value, this.icon);
 }

@@ -19,6 +19,7 @@ import '../../auth/bloc/auth_bloc.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../models/dashboard_summary.dart';
 import '../../../core/api/dio_client.dart';
+import '../../../core/utils/currency.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -581,7 +582,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     child: MouseRegion(
                                       cursor: SystemMouseCursors.click,
                                       child: Text(
-                                        '₹${p.price.toStringAsFixed(0)}',
+                                        CRMCurrencyFormatter.formatShort(p.price),
                                         style: TextStyle(
                                           color: CRMColors.primary,
                                           fontWeight: FontWeight.bold,
@@ -864,7 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 Text(
-                  '₹${p.price.toStringAsFixed(0)}',
+                  CRMCurrencyFormatter.formatShort(p.price),
                   style: TextStyle(
                     color: CRMColors.primary,
                     fontWeight: FontWeight.bold,
