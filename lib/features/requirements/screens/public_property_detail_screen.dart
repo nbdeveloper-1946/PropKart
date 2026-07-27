@@ -376,7 +376,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
         } else {
           ageDisplay = '20+ years';
         }
-        specsItems.add(_DetailItem('Property Age', ageDisplay, Icons.hourglass_empty_rounded));
+        specsItems.add(_DetailItem('Age (Years)', ageDisplay, Icons.hourglass_empty_rounded));
       }
       
       final superAreaVal = p['super_builtup_area'] != null ? double.tryParse(p['super_builtup_area'].toString()) : 0;
@@ -458,6 +458,11 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
       // 4. Key Details Items
       final List<_DetailItem> contactsItems = [];
       
+      final contactName = getValue(p, 'owner_name');
+      if (contactName.isNotEmpty) {
+        contactsItems.add(_DetailItem('Contact Name', contactName, Icons.person_outline));
+      }
+      
       final ownership = getValue(p, 'ownership_type_name');
       if (ownership.isNotEmpty) {
         contactsItems.add(_DetailItem('Ownership', ownership, Icons.badge_outlined));
@@ -471,17 +476,53 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
       final depositVal = p['deposit'] != null ? double.tryParse(p['deposit'].toString()) : null;
       final depositStr = (depositVal != null && depositVal > 0) ? CRMCurrencyFormatter.format(depositVal) : "₹0";
 
+      // Calculate Available From display fallback
+      final availableFrom = getValue(p, 'available_from');
+      String availableDisplay = 'Immediate';
+      if (availableFrom.isNotEmpty) {
+        availableDisplay = availableFrom;
+      } else {
+        final createdAtStr = getValue(p, 'created_at');
+        if (createdAtStr.isNotEmpty) {
+          try {
+            final parsedDate = DateTime.tryParse(createdAtStr);
+            if (parsedDate != null) {
+              availableDisplay = DateFormat('dd-MM-yyyy').format(parsedDate);
+            }
+          } catch (_) {}
+        }
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "$config in $areaName",
-            style: CRMTypography.headline.copyWith(
-              color: CRMColors.textOf(context),
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          if (p['title'] != null && p['title'].toString().isNotEmpty && p['title'].toString().toLowerCase() != "$config in $areaName".toLowerCase()) ...[
+            Text(
+              p['title'].toString(),
+              style: CRMTypography.headline.copyWith(
+                color: CRMColors.textOf(context),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
+            const SizedBox(height: CRMSpacing.xxs),
+            Text(
+              "$config in $areaName",
+              style: CRMTypography.bodyMedium.copyWith(
+                color: CRMColors.textSecondaryOf(context),
+                fontSize: 16,
+              ),
+            ),
+          ] else ...[
+            Text(
+              "$config in $areaName",
+              style: CRMTypography.headline.copyWith(
+                color: CRMColors.textOf(context),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
           const SizedBox(height: CRMSpacing.xs),
           Text(
             price,
@@ -505,7 +546,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
                 children: [
                   _buildDetailColumn(Icons.bed_rounded, "Bedrooms", "${p['bedrooms'] ?? '-'} BHK"),
                   _buildDetailColumn(Icons.square_foot_rounded, "Area", p['super_builtup_area'] != null ? "${p['super_builtup_area']} sqft" : "-"),
-                  _buildDetailColumn(Icons.event_available_rounded, "Available From", p['available_from'] ?? "Immediate"),
+                  _buildDetailColumn(Icons.event_available_rounded, "Available From", availableDisplay),
                 ],
               ),
             ),
@@ -650,9 +691,57 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
                 ),
                 Expanded(
                   flex: 6,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(CRMSpacing.l),
-                    child: buildDetailsSection(),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(CRMSpacing.l),
+                          child: buildDetailsSection(),
+                        ),
+                      ),
+                      if (agentMobile.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(CRMSpacing.m),
+                          decoration: BoxDecoration(
+                            color: CRMColors.cardBgOf(context),
+                            border: Border(top: BorderSide(color: CRMColors.borderOf(context))),
+                            boxShadow: CRMShadows.medium,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: CRMSpacing.s),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.button)),
+                                    side: BorderSide(color: CRMColors.borderOf(context)),
+                                  ),
+                                  icon: const Icon(Icons.phone_rounded),
+                                  label: const Text("Call Agent"),
+                                  onPressed: () => _launchUrlHelper("tel:$agentMobile", "Call"),
+                                ),
+                              ),
+                              const SizedBox(width: CRMSpacing.s),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _kWhatsAppGreen,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: CRMSpacing.s),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.button)),
+                                  ),
+                                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                                  label: const Text("Schedule Visit"),
+                                  onPressed: () {
+                                    final text = Uri.encodeComponent("Hi, I would like to schedule a visit to see property $code from your shortlisted share.");
+                                    _launchUrlHelper("https://wa.me/$agentMobile?text=$text", "Schedule");
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -669,7 +758,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
                 ],
               ),
             ),
-        bottomSheet: agentMobile.isNotEmpty
+        bottomSheet: !isDesktop && agentMobile.isNotEmpty
             ? Container(
                 padding: const EdgeInsets.all(CRMSpacing.m),
                 decoration: BoxDecoration(
