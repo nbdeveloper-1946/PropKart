@@ -223,204 +223,31 @@ class _SharePropertiesPageState extends State<SharePropertiesPage> {
       ),
     );
 
-    final propertiesList = ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _properties.length,
-      itemBuilder: (context, index) {
-        final p = _properties[index];
-        final double? priceVal = p['price'] != null ? double.tryParse(p['price'].toString()) : null;
-        final price = priceVal != null
-            ? '${CRMCurrencyFormatter.format(priceVal)} (${CRMCurrencyFormatter.formatWords(priceVal).replaceAll('₹', '')})'
-            : 'Price N/A';
-        final config = p['configuration_name'] ?? '${p['bedrooms'] ?? "-"} BHK';
-        final area = p['area_name'] ?? '';
-        final title = '$config in $area';
-        final imageUrls = p['images'] as List<dynamic>? ?? [];
-        final hasImage = imageUrls.isNotEmpty;
-        final areaSqft = p['super_builtup_area'] != null ? '${p['super_builtup_area']} sqft' : '';
-        final bedrooms = p['bedrooms'] != null ? '${p['bedrooms']} BHK' : '';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: CRMSpacing.l),
-          decoration: BoxDecoration(
-            color: CRMColors.cardBgOf(context),
-            borderRadius: BorderRadius.circular(CRMBorderRadius.l),
-            border: Border.all(color: CRMColors.borderOf(context)),
-            boxShadow: CRMShadows.medium,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Property Image Banner
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: hasImage
-                      ? Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.network(
-                              imageUrls.first.toString(),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                            ),
-                            Container(
-                              color: Colors.black.withValues(alpha: 0.45),
-                            ),
-                            Image.network(
-                              imageUrls.first.toString(),
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: CRMColors.skeletonBase,
-                                child: Icon(Icons.image_not_supported_rounded, size: 48, color: CRMColors.textMuted),
-                              ),
-                            ),
-                          ],
-                        )
-                      : Container(
-                          color: CRMColors.skeletonBase,
-                          child: Icon(Icons.image_rounded, size: 48, color: CRMColors.textMuted),
-                        ),
+    final propertiesList = Column(
+      children: [
+        for (int i = 0; i < _properties.length; i += (isDesktop ? 2 : 1)) ...[
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildPropertyItem(context, _properties[i], agentMobile),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(CRMSpacing.m),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: CRMTypography.cardTitle.copyWith(
-                        color: CRMColors.textOf(context),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: CRMSpacing.xs),
-                    Text(
-                      price,
-                      style: CRMTypography.cardTitle.copyWith(
-                        color: CRMColors.primary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (p['society'] != null && p['society'].toString().isNotEmpty) ...[
-                      const SizedBox(height: CRMSpacing.xxs),
-                      Text(p['society'], style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
-                    ],
-                    const SizedBox(height: CRMSpacing.m),
-                    
-                    // Quick Specs Row
-                    Row(
-                      children: [
-                        if (bedrooms.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: CRMColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.bed_rounded, size: 14, color: CRMColors.primary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  bedrooms,
-                                  style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: CRMSpacing.s),
-                        ],
-                        if (areaSqft.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: CRMColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.square_foot_rounded, size: 14, color: CRMColors.primary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  areaSqft,
-                                  style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: CRMSpacing.m),
-                    
-                    Text(
-                      p['description'] ?? '',
-                      style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: CRMSpacing.m),
-                    Divider(color: CRMColors.borderOf(context), height: 1),
-                    const SizedBox(height: CRMSpacing.m),
-                    
-                    // Buttons Row
-                    Wrap(
-                      spacing: CRMSpacing.s,
-                      runSpacing: CRMSpacing.s,
-                      children: [
-                        CRMButton(
-                          label: "View Details",
-                          onPressed: () => context.push('/share/${widget.sessionId}/property/${p['id']}'),
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
-                        ),
-                        if (agentMobile.isNotEmpty) ...[
-                          CRMButton(
-                            label: "Call Agent",
-                            prefixIcon: Icons.phone_rounded,
-                            onPressed: () => _launchUrlHelper("tel:$agentMobile", p['id'], "Call"),
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
-                          ),
-                          CRMButton(
-                            label: "Interested",
-                            prefixIcon: Icons.star_rounded,
-                            onPressed: () {
-                              final text = Uri.encodeComponent("Hi, I am interested in property ${p['property_code']} from your shortlisted share.");
-                              _launchUrlHelper("https://wa.me/$agentMobile?text=$text", p['id'], "Interested");
-                            },
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
-                          ),
-                          CRMButton(
-                            label: "Schedule Visit",
-                            prefixIcon: Icons.calendar_today_rounded,
-                            onPressed: () {
-                              final text = Uri.encodeComponent("Hi, I would like to schedule a visit for property ${p['property_code']} from your shortlisted share.");
-                              _launchUrlHelper("https://wa.me/$agentMobile?text=$text", p['id'], "Schedule");
-                            },
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+                const SizedBox(width: CRMSpacing.l),
+                Expanded(
+                  child: (i + 1 < _properties.length)
+                      ? _buildPropertyItem(context, _properties[i + 1], agentMobile)
+                      : const SizedBox.shrink(),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+            const SizedBox(height: CRMSpacing.l),
+          ] else ...[
+            _buildPropertyItem(context, _properties[i], agentMobile),
+            const SizedBox(height: CRMSpacing.l),
+          ],
+        ],
+      ],
     );
 
     return Scaffold(
@@ -449,6 +276,199 @@ class _SharePropertiesPageState extends State<SharePropertiesPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPropertyItem(BuildContext context, Map<String, dynamic> p, String agentMobile) {
+    final double? priceVal = p['price'] != null ? double.tryParse(p['price'].toString()) : null;
+    final price = priceVal != null
+        ? '${CRMCurrencyFormatter.format(priceVal)} (${CRMCurrencyFormatter.formatWords(priceVal).replaceAll('₹', '')})'
+        : 'Price N/A';
+    final config = p['configuration_name'] ?? '${p['bedrooms'] ?? "-"} BHK';
+    final area = p['area_name'] ?? '';
+    final title = '$config in $area';
+    final imageUrls = p['images'] as List<dynamic>? ?? [];
+    final hasImage = imageUrls.isNotEmpty;
+    final areaSqft = p['super_builtup_area'] != null ? '${p['super_builtup_area']} sqft' : '';
+    final bedrooms = p['bedrooms'] != null ? '${p['bedrooms']} BHK' : '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: CRMColors.cardBgOf(context),
+        borderRadius: BorderRadius.circular(CRMBorderRadius.l),
+        border: Border.all(color: CRMColors.borderOf(context)),
+        boxShadow: CRMShadows.medium,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Property Image Banner
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: SizedBox(
+              width: double.infinity,
+              child: hasImage
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          imageUrls.first.toString(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                        ),
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                        ),
+                        Image.network(
+                          imageUrls.first.toString(),
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: CRMColors.skeletonBase,
+                            child: Icon(Icons.image_not_supported_rounded, size: 48, color: CRMColors.textMuted),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Container(
+                      color: CRMColors.skeletonBase,
+                      child: Icon(Icons.image_rounded, size: 48, color: CRMColors.textMuted),
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(CRMSpacing.m),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: CRMTypography.cardTitle.copyWith(
+                    color: CRMColors.textOf(context),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: CRMSpacing.xs),
+                Text(
+                  price,
+                  style: CRMTypography.cardTitle.copyWith(
+                    color: CRMColors.primary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (p['society'] != null && p['society'].toString().isNotEmpty) ...[
+                  const SizedBox(height: CRMSpacing.xxs),
+                  Text(p['society'], style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context))),
+                ],
+                const SizedBox(height: CRMSpacing.m),
+                
+                // Quick Specs Row
+                Row(
+                  children: [
+                    if (bedrooms.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: CRMColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bed_rounded, size: 14, color: CRMColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              bedrooms,
+                              style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: CRMSpacing.s),
+                    ],
+                    if (areaSqft.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: CRMColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.square_foot_rounded, size: 14, color: CRMColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              areaSqft,
+                              style: CRMTypography.captionBold.copyWith(color: CRMColors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: CRMSpacing.m),
+                
+                Text(
+                  p['description'] ?? '',
+                  style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: CRMSpacing.m),
+                Divider(color: CRMColors.borderOf(context), height: 1),
+                const SizedBox(height: CRMSpacing.m),
+                
+                // Buttons Row
+                Wrap(
+                  spacing: CRMSpacing.s,
+                  runSpacing: CRMSpacing.s,
+                  children: [
+                    CRMButton(
+                      label: "View Details",
+                      onPressed: () => context.push('/share/${widget.sessionId}/property/${p['id']}'),
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+                    ),
+                    if (agentMobile.isNotEmpty) ...[
+                      CRMButton(
+                        label: "Call Agent",
+                        prefixIcon: Icons.phone_rounded,
+                        onPressed: () => _launchUrlHelper("tel:$agentMobile", p['id'], "Call"),
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+                      ),
+                      CRMButton(
+                        label: "Interested",
+                        prefixIcon: Icons.star_rounded,
+                        onPressed: () {
+                          final text = Uri.encodeComponent("Hi, I am interested in property ${p['property_code']} from your shortlisted share.");
+                          _launchUrlHelper("https://wa.me/$agentMobile?text=$text", p['id'], "Interested");
+                        },
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+                      ),
+                      CRMButton(
+                        label: "Schedule Visit",
+                        prefixIcon: Icons.calendar_today_rounded,
+                        onPressed: () {
+                          final text = Uri.encodeComponent("Hi, I would like to schedule a visit for property ${p['property_code']} from your shortlisted share.");
+                          _launchUrlHelper("https://wa.me/$agentMobile?text=$text", p['id'], "Schedule");
+                        },
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
