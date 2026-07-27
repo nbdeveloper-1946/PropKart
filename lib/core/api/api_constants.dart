@@ -3,7 +3,18 @@ import 'package:flutter/foundation.dart';
 class ApiConstants {
   static const String primaryBaseUrl = "https://prop-kart-backend.vercel.app/api/v1";
   static const String backupBaseUrl = "https://nb-listings-backend.vercel.app/api/v1";
-  static const String baseUrl = primaryBaseUrl;
+
+  /// Deployed Flutter web uses same-origin `/api/v1` (Vercel rewrite → backend)
+  /// so HttpOnly cookies are first-party. Local web / mobile hit the API host directly.
+  static String get baseUrl {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        return '${Uri.base.origin}/api/v1';
+      }
+    }
+    return primaryBaseUrl;
+  }
 
   /// Prefer compile-time defines in CI:
   /// `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`

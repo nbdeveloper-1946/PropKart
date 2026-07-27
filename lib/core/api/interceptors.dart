@@ -61,7 +61,17 @@ class JwtInterceptor extends Interceptor {
     try {
       if (kIsWeb) {
         options.headers['X-Auth-Transport'] = 'cookie';
-        options.headers.remove('Authorization');
+        if (!_matchesAny(options.path, _publicPrefixes)) {
+          // Memory Bearer fallback when HttpOnly cookies are not sent yet.
+          final token = await _secureStorage.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          } else {
+            options.headers.remove('Authorization');
+          }
+        } else {
+          options.headers.remove('Authorization');
+        }
       } else if (!_matchesAny(options.path, _publicPrefixes)) {
         final token = await _secureStorage.getToken();
         if (token != null && token.isNotEmpty) {
@@ -88,7 +98,12 @@ class JwtInterceptor extends Interceptor {
             final opts = err.requestOptions;
             if (kIsWeb) {
               opts.headers['X-Auth-Transport'] = 'cookie';
-              opts.headers.remove('Authorization');
+              final token = await _secureStorage.getToken();
+              if (token != null && token.isNotEmpty) {
+                opts.headers['Authorization'] = 'Bearer $token';
+              } else {
+                opts.headers.remove('Authorization');
+              }
             } else {
               final token = await _secureStorage.getToken();
               opts.headers['Authorization'] = 'Bearer $token';

@@ -20,11 +20,15 @@ class AuthRepository {
     final user = UserModel.fromJson(responseData);
 
     if (kIsWeb) {
-      // Tokens arrive only as HttpOnly cookies — never store JWTs in JS.
+      // Prefer HttpOnly cookies (same-origin proxy). Keep access token in memory
+      // as fallback when the browser blocks cross-site cookies.
       await _secureStorage.markWebCookieSession(
         active: true,
         persistHint: rememberMe,
       );
+      if (user.token != null && user.token!.isNotEmpty) {
+        await _secureStorage.saveToken(user.token!, persist: false);
+      }
       return user.copyWith(token: null);
     }
 
@@ -51,7 +55,14 @@ class AuthRepository {
   Future<bool> refreshSession() async {
     if (kIsWeb) {
       try {
-        await _authService.refresh(null);
+        final response = await _authService.refresh(null);
+        final data = response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response;
+        final access = data['token']?.toString() ?? data['accessToken']?.toString();
+        if (access != null && access.isNotEmpty) {
+          await _secureStorage.saveToken(access, persist: false);
+        }
         await _secureStorage.markWebCookieSession(
           active: true,
           persistHint: await _secureStorage.hasWebSessionHint(),
@@ -119,7 +130,8 @@ class AuthRepository {
 
   Future<bool> isAuthenticated() async {
     if (kIsWeb) {
-      // Cold start: if remember-me hint exists, probe /me with cookies.
+      final mem = await _secureStorage.getToken();
+      if (mem != null && mem.isNotEmpty) return true;
       if (SecureStorage.webCookieSession) return true;
       if (await _secureStorage.hasWebSessionHint()) {
         try {
@@ -131,7 +143,6 @@ class AuthRepository {
           return false;
         }
       }
-      // Session cookie may still exist without a hint — try once.
       try {
         await _authService.getProfile();
         SecureStorage.webCookieSession = true;

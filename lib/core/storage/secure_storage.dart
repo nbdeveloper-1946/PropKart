@@ -15,32 +15,27 @@ class SecureStorage {
   /// Web cookie-session marker (not a secret — cookies hold the tokens).
   static bool webCookieSession = false;
 
-  /// Always clears any previous persisted tokens first so a non-remembered
-  /// login cannot leave another user's JWT on disk.
-  ///
-  /// On web with HttpOnly cookies, tokens are never stored in JS.
+  /// On web: keep access token in memory only as fallback when cookies are blocked.
+  /// Never persist JWTs to disk/localStorage on web.
   Future<void> saveToken(String token, {bool persist = true}) async {
-    if (kIsWeb) {
-      // Cookie mode: do not keep JWTs in JS-readable storage.
-      inMemoryToken = null;
-      await _storage.delete(key: _tokenKey);
-      return;
-    }
     inMemoryToken = token;
     await _storage.delete(key: _tokenKey);
+    if (kIsWeb) {
+      return;
+    }
     if (persist) {
       await _storage.write(key: _tokenKey, value: token);
     }
   }
 
   Future<void> saveRefreshToken(String? refreshToken, {bool persist = true}) async {
-    if (kIsWeb) {
-      inMemoryRefreshToken = null;
-      await _storage.delete(key: _refreshTokenKey);
-      return;
-    }
     inMemoryRefreshToken = refreshToken;
     await _storage.delete(key: _refreshTokenKey);
+    if (kIsWeb) {
+      // Refresh stays in HttpOnly cookie on web — do not persist to JS storage.
+      inMemoryRefreshToken = null;
+      return;
+    }
     if (refreshToken == null || refreshToken.isEmpty) return;
     if (persist) {
       await _storage.write(key: _refreshTokenKey, value: refreshToken);
@@ -65,8 +60,7 @@ class SecureStorage {
   }
 
   Future<String?> getToken() async {
-    if (kIsWeb) return null;
-    return inMemoryToken ?? await _storage.read(key: _tokenKey);
+    return inMemoryToken ?? (kIsWeb ? null : await _storage.read(key: _tokenKey));
   }
 
   Future<String?> getRefreshToken() async {
