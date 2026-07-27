@@ -45,6 +45,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   String? _selectedConfigId;
   final List<String> _selectedConfigIds = [];
   String? _selectedListingTypeId;
+  String? _selectedFurnishingId;
+  String? _selectedFacingId;
   String _selectedStatus = "Not Started";
   final List<String> _selectedAreaIds = [];
   String _areaSearchQuery = '';
@@ -57,6 +59,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   List<LookupItem> _configurations = [];
   List<AreaLookup> _areas = [];
   List<LookupItem> _listingTypes = [];
+  List<LookupItem> _furnishings = [];
+  List<LookupItem> _facings = [];
 
   @override
   void initState() {
@@ -96,6 +100,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
         _configurations = metadata.configurations;
         _areas = metadata.areas;
         _listingTypes = metadata.listingTypes;
+        _furnishings = metadata.furnishings;
+        _facings = metadata.facings;
         
         if (widget.requirement == null) {
           if (_categories.isNotEmpty) _selectedCategoryId = _categories.first.id;
@@ -118,6 +124,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
             _selectedConfigIds.add(req.configurationId!);
           }
           _selectedListingTypeId = req.listingTypeId;
+          _selectedFurnishingId = req.furnishing;
+          _selectedFacingId = req.facing;
           
           String statusVal = req.status;
           if (statusVal == 'Active' || statusVal == 'Live') statusVal = 'Interested';
@@ -154,6 +162,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       'remarks': _remarksController.text,
       'status': _selectedStatus,
       'areaIds': _selectedAreaIds,
+      'furnishing': _selectedFurnishingId,
+      'facing': _selectedFacingId,
     };
     CRMDraftRepository().saveDraft('requirement', draftData);
   }
@@ -198,6 +208,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
                   final List<String> areas = List<String>.from(draft['areaIds'] ?? []);
                   _selectedAreaIds.clear();
                   _selectedAreaIds.addAll(areas);
+                  _selectedFurnishingId = draft['furnishing'];
+                  _selectedFacingId = draft['facing'];
                 });
                 if (_pageController.hasClients) {
                   _pageController.jumpToPage(_activeStep);
@@ -439,6 +451,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       remarks: _remarksController.text.trim().isEmpty ? null : _remarksController.text.trim(),
       status: _selectedStatus,
       createdAt: widget.requirement?.createdAt ?? DateTime.now(),
+      furnishing: _selectedFurnishingId,
+      facing: _selectedFacingId,
     );
 
     _isSaved = true;
@@ -886,6 +900,20 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
             value: _selectedTypeId,
             items: filteredTypes.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
             onChanged: (val) => setState(() => _selectedTypeId = val),
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          _buildDropdown(
+            label: 'Furnishing',
+            value: _selectedFurnishingId,
+            items: _furnishings.map((f) => DropdownMenuItem(value: f.id, child: Text(f.name))).toList(),
+            onChanged: (val) => setState(() => _selectedFurnishingId = val),
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          _buildDropdown(
+            label: 'Facing',
+            value: _selectedFacingId,
+            items: _facings.map((f) => DropdownMenuItem(value: f.id, child: Text(f.name))).toList(),
+            onChanged: (val) => setState(() => _selectedFacingId = val),
           ),
           const SizedBox(height: CRMSpacing.m),
           if (filteredConfigs.isNotEmpty) ...[

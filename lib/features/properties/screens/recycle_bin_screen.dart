@@ -26,6 +26,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   bool _isLoading = true;
   String _selectedTab = 'Properties'; // 'Properties' or 'Requirements'
+  String _requirementsSubTab = 'Bin'; // 'Bin' or 'Not Interested'
   int _autoDeleteDays = 30; // 15, 30, 60
 
   List<PropertyModel> _binProperties = [];
@@ -93,7 +94,9 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   Future<void> _fetchBinRequirements() async {
     setState(() => _isLoading = true);
     try {
-      final res = await _requirementsService.getBinRequirements();
+      final res = _requirementsSubTab == 'Bin'
+          ? await _requirementsService.getBinRequirements()
+          : await _requirementsService.getRequirements(status: 'Not Interested');
       final data = res['data'] as Map<String, dynamic>? ?? {};
       final list = data['requirements'] as List? ?? [];
       setState(() {
@@ -104,7 +107,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load bin requirements: $e'), backgroundColor: CRMColors.danger),
+          SnackBar(content: Text('Failed to load requirements: $e'), backgroundColor: CRMColors.danger),
         );
       }
     }
@@ -124,9 +127,13 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
     }
   }
 
-  Future<void> _restoreRequirement(String id) async {
+  Future<void> _restoreRequirement(RequirementModel r) async {
     try {
-      await _requirementsService.restoreRequirement(id);
+      if (_requirementsSubTab == 'Bin') {
+        await _requirementsService.restoreRequirement(r.id);
+      } else {
+        await _requirementsService.updateRequirement(r.id, {'status': 'Interested'});
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Requirement restored successfully'), backgroundColor: CRMColors.success),
       );
@@ -134,6 +141,20 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to restore requirement: $e'), backgroundColor: CRMColors.danger),
+      );
+    }
+  }
+
+  Future<void> _deleteRequirement(RequirementModel r) async {
+    try {
+      await _requirementsService.deleteRequirement(r.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Requirement moved to Recycle Bin'), backgroundColor: CRMColors.success),
+      );
+      _fetchBinRequirements();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete requirement: $e'), backgroundColor: CRMColors.danger),
       );
     }
   }
@@ -254,7 +275,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   Widget build(BuildContext context) {
     final bool hasData = _selectedTab == 'Properties' 
         ? _binProperties.isNotEmpty 
-        : _binRequirements.isNotEmpty;
+        : (_requirementsSubTab == 'Bin' && _binRequirements.isNotEmpty);
     final bool isMobile = MediaQuery.of(context).size.width < 768;
 
     Widget headerControls = Wrap(
@@ -448,6 +469,52 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             pageHeader,
+            if (_selectedTab == 'Requirements') ...[
+              const SizedBox(height: CRMSpacing.m),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Bin'),
+                    selected: _requirementsSubTab == 'Bin',
+                    selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: _requirementsSubTab == 'Bin' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                      fontWeight: _requirementsSubTab == 'Bin' ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _requirementsSubTab = 'Bin';
+                          _currentRequirementsPage = 1;
+                        });
+                        _fetchBinRequirements();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: CRMSpacing.s),
+                  ChoiceChip(
+                    label: const Text('Not Interested'),
+                    selected: _requirementsSubTab == 'Not Interested',
+                    selectedColor: CRMColors.primaryOf(context).withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: _requirementsSubTab == 'Not Interested' ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
+                      fontWeight: _requirementsSubTab == 'Not Interested' ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _requirementsSubTab = 'Not Interested';
+                          _currentRequirementsPage = 1;
+                        });
+                        _fetchBinRequirements();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: CRMSpacing.l),
             CRMCard(
               child: _isLoading
@@ -521,7 +588,9 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                               },
                             )
                       : _binRequirements.isEmpty
-                          ? _buildEmptyState('Requirements deleted from active pipeline will appear here.')
+                          ? _buildEmptyState(_requirementsSubTab == 'Bin'
+                              ? 'Requirements deleted from active pipeline will appear here.'
+                              : 'Requirements marked as "Not Interested" will appear here.')
                           : Builder(
                               builder: (context) {
                                 final totalItems = _binRequirements.length;
@@ -582,15 +651,22 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                                 children: [
                                                   IconButton(
                                                     icon: Icon(Icons.restore_rounded, color: CRMColors.success, size: 20),
-                                                    tooltip: 'Restore Requirement',
-                                                    onPressed: () => _restoreRequirement(r.id),
+                                                    tooltip: _requirementsSubTab == 'Bin' ? 'Restore Requirement' : 'Make Active / Restore',
+                                                    onPressed: () => _restoreRequirement(r),
                                                   ),
                                                   const SizedBox(width: 8),
-                                                  IconButton(
-                                                    icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
-                                                    tooltip: 'Permanently Delete',
-                                                    onPressed: () => _permanentDeleteRequirement(r.id),
-                                                  ),
+                                                  if (_requirementsSubTab == 'Bin')
+                                                    IconButton(
+                                                      icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                                      tooltip: 'Permanently Delete',
+                                                      onPressed: () => _permanentDeleteRequirement(r.id),
+                                                    )
+                                                  else
+                                                    IconButton(
+                                                      icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 20),
+                                                      tooltip: 'Move to Recycle Bin',
+                                                      onPressed: () => _deleteRequirement(r),
+                                                    ),
                                                 ],
                                               ),
                                             ),

@@ -28,6 +28,8 @@ class RequirementModel {
   final String? assigneeName;
   final String? creatorName;
   final String? nextFollowupDate;
+  final String? furnishing;
+  final String? facing;
 
   RequirementModel({
     required this.id,
@@ -59,6 +61,8 @@ class RequirementModel {
     this.assigneeName,
     this.creatorName,
     this.nextFollowupDate,
+    this.furnishing,
+    this.facing,
   });
 
   factory RequirementModel.fromJson(Map<String, dynamic> json) {
@@ -166,6 +170,8 @@ class RequirementModel {
       assigneeName: json['assigneeName'] ?? json['assignee_name'],
       creatorName: json['creatorName'] ?? json['creator_name'],
       nextFollowupDate: json['nextFollowupDate'] ?? json['next_followup_date'],
+      furnishing: json['furnishing'] ?? json['furnishing_type_id'],
+      facing: json['facing'] ?? json['facing_type_id'],
     );
   }
 
@@ -198,6 +204,8 @@ class RequirementModel {
       'assigneeName': assigneeName,
       'creatorName': creatorName,
       'nextFollowupDate': nextFollowupDate,
+      'furnishing': furnishing,
+      'facing': facing,
     };
   }
 
@@ -221,6 +229,8 @@ class RequirementModel {
       'property_type_ids': propertyTypeIds.isNotEmpty ? propertyTypeIds : [propertyTypeId],
       'remarks': remarks,
       'status': status,
+      'furnishing_type_id': furnishing,
+      'facing_type_id': facing,
     };
   }
 
@@ -336,6 +346,8 @@ class RequirementModel {
     String? assigneeName,
     String? creatorName,
     String? nextFollowupDate,
+    String? furnishing,
+    String? facing,
   }) {
     return RequirementModel(
       id: id ?? this.id,
@@ -367,6 +379,8 @@ class RequirementModel {
       assigneeName: assigneeName ?? this.assigneeName,
       creatorName: creatorName ?? this.creatorName,
       nextFollowupDate: nextFollowupDate ?? this.nextFollowupDate,
+      furnishing: furnishing ?? this.furnishing,
+      facing: facing ?? this.facing,
     );
   }
 }
