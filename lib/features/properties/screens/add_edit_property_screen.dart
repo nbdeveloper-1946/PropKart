@@ -672,13 +672,18 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
   }
 
   void _calculateDeposit() {
-    if (_selectedDepositMonth == null) return;
+    if (_selectedDepositMonth == null) {
+      _depositController.text = CRMCurrencyFormatter.format(0.0);
+      return;
+    }
     final numberStr = _selectedDepositMonth!.replaceAll(RegExp(r'[^0-9.]'), '');
     final months = double.tryParse(numberStr) ?? 0.0;
     final price = CRMCurrencyFormatter.parse(_priceController.text);
     if (price > 0 && months > 0) {
       final deposit = price * months;
       _depositController.text = CRMCurrencyFormatter.format(deposit);
+    } else {
+      _depositController.text = CRMCurrencyFormatter.format(0.0);
     }
   }
 
@@ -1329,7 +1334,24 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
                     ),
                     items: widget.metadata.listingTypes.map((l) => DropdownMenuItem(value: l.id, child: Text(l.name))).toList(),
-                    onChanged: (v) => setState(() => _selectedListingType = v),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedListingType = v;
+                        final selectedListingTypeItem = widget.metadata.listingTypes.firstWhere(
+                          (l) => l.id == _selectedListingType,
+                          orElse: () => LookupItem(id: '', name: ''),
+                        );
+                        final listingName = selectedListingTypeItem.name.trim();
+                        final isReSale = listingName.toLowerCase().contains('sale') ||
+                            listingName.toLowerCase().contains('resale') ||
+                            selectedListingTypeItem.id == 'resale' ||
+                            selectedListingTypeItem.id == 'sale';
+                        if (isReSale) {
+                          _selectedDepositMonth = null;
+                          _depositController.text = CRMCurrencyFormatter.format(0.0);
+                        }
+                      });
+                    },
                   ),
                 ),
                 const SizedBox(width: CRMSpacing.xs),
@@ -1386,7 +1408,24 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
                           ),
                           items: widget.metadata.listingTypes.map((l) => DropdownMenuItem(value: l.id, child: Text(l.name))).toList(),
-                          onChanged: (v) => setState(() => _selectedListingType = v),
+                          onChanged: (v) {
+                            setState(() {
+                              _selectedListingType = v;
+                              final selectedListingTypeItem = widget.metadata.listingTypes.firstWhere(
+                                (l) => l.id == _selectedListingType,
+                                orElse: () => LookupItem(id: '', name: ''),
+                              );
+                              final listingName = selectedListingTypeItem.name.trim();
+                              final isReSale = listingName.toLowerCase().contains('sale') ||
+                                  listingName.toLowerCase().contains('resale') ||
+                                  selectedListingTypeItem.id == 'resale' ||
+                                  selectedListingTypeItem.id == 'sale';
+                              if (isReSale) {
+                                _selectedDepositMonth = null;
+                                _depositController.text = CRMCurrencyFormatter.format(0.0);
+                              }
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(width: CRMSpacing.xs),
