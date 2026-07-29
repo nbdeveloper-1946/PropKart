@@ -41,6 +41,8 @@ class DashboardRepository {
     int resaleReqs = 0;
     int rentalWonReqs = 0;
     int resaleWonReqs = 0;
+    int rentalSiteVisits = 0;
+    int resaleSiteVisits = 0;
     for (final item in localReqs) {
       if (item.status == 'Bin') continue;
 
@@ -48,6 +50,7 @@ class DashboardRepository {
       final id = item.listingTypeId ?? '';
       final combined = '$name $id'.toLowerCase();
       final isWon = item.status == 'Won' || item.status == 'Closed';
+      final isSiteVisit = item.status == 'Site Visit';
 
       if (combined.contains('rent')) {
         if (isWon) {
@@ -55,11 +58,17 @@ class DashboardRepository {
         } else {
           rentalReqs++;
         }
+        if (isSiteVisit) {
+          rentalSiteVisits++;
+        }
       } else if (combined.contains('sale') || combined.contains('resale')) {
         if (isWon) {
           resaleWonReqs++;
         } else {
           resaleReqs++;
+        }
+        if (isSiteVisit) {
+          resaleSiteVisits++;
         }
       }
     }
@@ -68,14 +77,14 @@ class DashboardRepository {
       final updatedSummary = DashboardSummary(
         totalProperties: cachedData.summary.totalProperties,
         available: cachedData.summary.available,
-        sold: cachedData.summary.sold,
-        rented: cachedData.summary.rented,
+        sold: resaleSiteVisits,
+        rented: rentalSiteVisits,
         requirements: rentalReqs + resaleReqs,
         users: cachedData.summary.users,
         rentalAvailable: cachedData.summary.rentalAvailable,
         resaleAvailable: cachedData.summary.resaleAvailable,
-        rentalRented: cachedData.summary.rentalRented,
-        resaleSold: cachedData.summary.resaleSold,
+        rentalRented: rentalSiteVisits,
+        resaleSold: resaleSiteVisits,
         rentalRequirements: rentalReqs,
         resaleRequirements: resaleReqs,
         rentalWonRequirements: rentalWonReqs,
@@ -109,14 +118,14 @@ class DashboardRepository {
     final updatedSummary = DashboardSummary(
       totalProperties: model.summary.totalProperties,
       available: model.summary.available,
-      sold: model.summary.sold,
-      rented: model.summary.rented,
+      sold: resaleSiteVisits,
+      rented: rentalSiteVisits,
       requirements: rentalReqs + resaleReqs,
       users: model.summary.users,
       rentalAvailable: model.summary.rentalAvailable,
       resaleAvailable: model.summary.resaleAvailable,
-      rentalRented: model.summary.rentalRented,
-      resaleSold: model.summary.resaleSold,
+      rentalRented: rentalSiteVisits,
+      resaleSold: resaleSiteVisits,
       rentalRequirements: rentalReqs,
       resaleRequirements: resaleReqs,
       rentalWonRequirements: rentalWonReqs,

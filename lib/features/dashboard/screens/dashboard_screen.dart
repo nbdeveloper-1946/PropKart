@@ -46,6 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _notePage = 1;
   static const int _notesPerPage = 5;
   final Map<String, bool> _optimisticChecklistStates = {};
+  final List<ChecklistItem> _optimisticAddedChecklistItems = [];
+  final Set<String> _optimisticDeletedChecklistIds = {};
 
   @override
   void initState() {
@@ -83,8 +85,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return BlocConsumer<DashboardBloc, DashboardState>(
       listener: (context, state) {
-        if (state is DashboardLoadedState || state is DashboardRefreshing) {
+        if (state is DashboardLoadedState) {
           _optimisticChecklistStates.clear();
+          _optimisticAddedChecklistItems.clear();
+          _optimisticDeletedChecklistIds.clear();
         }
       },
       builder: (context, state) {
@@ -262,17 +266,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       if (_activeTab == 'Re-Sale')
         CRMKPICard(
-          title: 'Sold',
+          title: 'Site Visit Done',
           value: '$soldVal',
-          icon: Icons.sell_outlined,
+          icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.warning,
           growthPercent: summary.soldTrend,
         ),
       if (_activeTab == 'Rental')
         CRMKPICard(
-          title: 'Rented',
+          title: 'Site Visit Done',
           value: '$rentedVal',
-          icon: Icons.key_outlined,
+          icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.info,
           growthPercent: summary.rentedTrend,
         ),
@@ -305,13 +309,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             spacing: CRMSpacing.s,
             runSpacing: CRMSpacing.xs,
             children: [
-              Text(
-                'Property Metrics',
-                style: CRMTypography.sectionTitle.copyWith(
-                  color: CRMColors.textOf(context),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               Container(
                 height: 38,
                 padding: const EdgeInsets.all(CRMSpacing.xxs),
@@ -888,7 +885,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTodayWork(List<ChecklistItem> items) {
-    final totalCount = items.length;
+    final allItems = [...items, ..._optimisticAddedChecklistItems];
+    final activeItems = allItems.where((item) => !_optimisticDeletedChecklistIds.contains(item.id)).toList();
+
+    final totalCount = activeItems.length;
     final totalPages = (totalCount / _notesPerPage).ceil();
     final currentPage = _notePage.clamp(1, totalPages > 0 ? totalPages : 1);
 
@@ -896,7 +896,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final endIndex = (startIndex + _notesPerPage).clamp(0, totalCount);
 
     final pageItems = (startIndex < totalCount)
-        ? items.sublist(startIndex, endIndex)
+        ? activeItems.sublist(startIndex, endIndex)
         : <ChecklistItem>[];
 
     return CRMCard(
@@ -910,7 +910,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: CRMSpacing.m),
-        child: items.isEmpty
+        child: activeItems.isEmpty
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -984,16 +984,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 setState(() {
                   _optimisticChecklistStates[item.id] = val;
                 });
-                try {
-                  await DioClient.dio.patch('/checklist/${item.id}/toggle', data: {'is_completed': val});
-                  if (mounted) {
-                    context.read<DashboardBloc>().add(RefreshDashboard());
-                  }
-                } catch (_) {
-                  if (mounted) {
-                    setState(() {
-                      _optimisticChecklistStates.remove(item.id);
-                    });
+                if (!item.id.startsWith('temp_')) {
+                  try {
+                    await DioClient.dio.patch('/checklist/${item.id}/toggle', data: {'is_completed': val});
+                    if (mounted) {
+                      context.read<DashboardBloc>().add(RefreshDashboard());
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      setState(() {
+                        _optimisticChecklistStates.remove(item.id);
+                      });
+                    }
                   }
                 }
               }
@@ -1013,12 +1015,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 18),
             onPressed: () async {
-              try {
-                await DioClient.dio.delete('/checklist/${item.id}');
-                if (mounted) {
-                  context.read<DashboardBloc>().add(RefreshDashboard());
+              final itemId = item.id;
+              setState(() {
+                _optimisticDeletedChecklistIds.add(itemId);
+                _optimisticAddedChecklistItems.removeWhere((x) => x.id == itemId);
+              });
+              if (!itemId.startsWith('temp_')) {
+                try {
+                  await DioClient.dio.delete('/checklist/$itemId');
+                  if (mounted) {
+                    context.read<DashboardBloc>().add(RefreshDashboard());
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    setState(() {
+                      _optimisticDeletedChecklistIds.remove(itemId);
+                    });
+                  }
                 }
-              } catch (_) {}
+              }
             },
           ),
         ],
@@ -1051,17 +1066,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             CRMButton(
               label: 'Save',
-              onPressed: () async {
+              onPressed: () {
                 final title = controller.text.trim();
                 if (title.isNotEmpty) {
-                  try {
-                    await DioClient.dio.post('/checklist', data: {'title': title});
+                  final tempItem = ChecklistItem(
+                    id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+                    title: title,
+                    isCompleted: false,
+                    dueDate: '',
+                  );
+                  setState(() {
+                    _optimisticAddedChecklistItems.add(tempItem);
+                  });
+                  Navigator.pop(ctx);
+                  DioClient.dio.post('/checklist', data: {'title': title}).then((_) {
                     if (mounted) {
                       context.read<DashboardBloc>().add(RefreshDashboard());
                     }
-                  } catch (_) {}
-                }
-                if (ctx.mounted) {
+                  }).catchError((_) {
+                    if (mounted) {
+                      setState(() {
+                        _optimisticAddedChecklistItems.removeWhere((x) => x.id == tempItem.id);
+                      });
+                    }
+                  });
+                } else {
                   Navigator.pop(ctx);
                 }
               },
@@ -1207,10 +1236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return CRMCard(
       elevated: true,
-      title: isSiteVisitsTab ? "Site Visits" : "Upcoming Follow-ups",
-      subtitle: isSiteVisitsTab
-          ? 'Scheduled property site visits and client meetings'
-          : 'Schedule of communications and client appointments',
+      title: isSiteVisitsTab ? "Site Visits" : "Scheduled",
       headerAction: isMobile ? null : dateSelection,
       child: Padding(
         padding: const EdgeInsets.only(top: CRMSpacing.m),
