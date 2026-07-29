@@ -310,18 +310,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             runSpacing: CRMSpacing.xs,
             children: [
               Container(
-                height: 38,
-                padding: const EdgeInsets.all(CRMSpacing.xxs),
+                height: 44,
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: CRMColors.cardBgOf(context),
-                  borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                  border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildMetricsTabButton('Rental'),
-                    const SizedBox(width: CRMSpacing.xxs),
+                    const SizedBox(width: 4),
                     _buildMetricsTabButton('Re-Sale'),
                   ],
                 ),
@@ -359,20 +359,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: AnimatedContainer(
         duration: CRMMotion.tabSwitch,
         curve: CRMMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.l),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? CRMColors.primary.withOpacity(0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
-          border: isSelected
-              ? Border.all(color: CRMColors.primary.withOpacity(0.3), width: 0.5)
-              : null,
+          color: isSelected ? const Color(0xFF64826F) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          label,
-          style: CRMTypography.captionBold.copyWith(
-            color: isSelected ? CRMColors.primary : CRMColors.textSecondaryOf(context),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          label == 'Rental' ? 'Rent' : label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isSelected ? Colors.white : const Color(0xFF6B7280),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
           ),
         ),
       ),

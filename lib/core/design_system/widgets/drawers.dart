@@ -11,7 +11,10 @@ import '../../utils/budget_formatter.dart';
 import 'cards.dart';
 import 'buttons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'crm_embedded_video_player.dart';
+import '../../../../features/auth/bloc/auth_bloc.dart';
+import '../../../../features/auth/models/user_model.dart' as auth_model;
 
 void showCRMPropertyDrawer(BuildContext context, PropertyModel property) {
   showGeneralDialog(
@@ -56,6 +59,13 @@ class BuildPropertyDetailWidget extends StatelessWidget {
     final screenWidth = mediaQuery.size.width;
     final isMobile = screenWidth < 768;
 
+    final authState = context.read<AuthBloc>().state;
+    bool isUserAdminOrSuperAdmin = false;
+    if (authState is Authenticated) {
+      final role = authState.user.role;
+      isUserAdminOrSuperAdmin = role == 'Admin' || role == 'Super Admin';
+    }
+
     final List<PropertyDetailItem> basicItems = [];
     if (_isValidValue(property.listingTypeName)) {
       basicItems.add(PropertyDetailItem('Listing Type', property.listingTypeName, Icons.sell_outlined));
@@ -80,7 +90,7 @@ class BuildPropertyDetailWidget extends StatelessWidget {
       basicItems.add(PropertyDetailItem('Maintenance', '₹${BudgetFormatter.format(property.maintenance)}/mo', Icons.build_circle_outlined));
     }
     basicItems.add(PropertyDetailItem('Verification', property.isVerified ? 'Verified' : 'Pending Verification', Icons.verified_outlined));
-    if (_isValidValue(property.createdByName)) {
+    if (isUserAdminOrSuperAdmin && _isValidValue(property.createdByName)) {
       basicItems.add(PropertyDetailItem('Created By', property.createdByName, Icons.person_outline_rounded));
     }
     basicItems.add(PropertyDetailItem('Created At', DateFormat('dd-MM-yyyy').format(property.createdAt), Icons.calendar_today_outlined));

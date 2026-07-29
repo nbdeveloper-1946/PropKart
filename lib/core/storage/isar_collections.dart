@@ -117,6 +117,8 @@ class RequirementLocal {
   String? organizationId;
   String? listingTypeId;
   String? listingTypeName;
+  String? creatorName;
+  String? assigneeName;
 }
 
 @collection

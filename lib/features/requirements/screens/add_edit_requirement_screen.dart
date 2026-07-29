@@ -10,6 +10,8 @@ import '../../owners/repository/owners_repository.dart';
 import '../../owners/models/owner_model.dart';
 import '../../requirements/repository/requirements_repository.dart';
 import '../../../core/storage/repository_coordinator.dart';
+import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/models/user_model.dart';
 
 class AddEditRequirementScreen extends StatefulWidget {
   final RequirementModel? requirement;
@@ -427,6 +429,12 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       return match.name;
     }).toList();
 
+    final authState = context.read<AuthBloc>().state;
+    UserModel? currentUser;
+    if (authState is Authenticated) {
+      currentUser = authState.user;
+    }
+
     final budgetVal = CRMCurrencyFormatter.parse(_budgetController.text);
     final minBudget = budgetVal * 0.8;
     final maxBudget = budgetVal * 1.2;
@@ -455,6 +463,8 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       createdAt: widget.requirement?.createdAt ?? DateTime.now(),
       furnishingIds: _selectedFurnishingIds,
       facingIds: _selectedFacingIds,
+      adminId: widget.requirement?.adminId ?? currentUser?.id,
+      creatorName: widget.requirement?.creatorName ?? currentUser?.fullName,
     );
 
     _isSaved = true;
@@ -1133,46 +1143,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
         children: [
           Text("Step 7: Review & Validate", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: CRMSpacing.m),
-          
-          // Scores Card
-          Container(
-            padding: const EdgeInsets.all(CRMSpacing.m),
-            decoration: BoxDecoration(
-              color: CRMColors.backgroundOf(context),
-              borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-              border: Border.all(color: CRMColors.borderOf(context)),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("Completeness:", style: CRMTypography.caption),
-                    Text("${(comp * 100).toStringAsFixed(0)}%", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                LinearProgressIndicator(value: comp, color: CRMColors.success, backgroundColor: CRMColors.borderOf(context)),
-                const SizedBox(height: CRMSpacing.s),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("Matching Readiness:", style: CRMTypography.caption),
-                    Text(
-                      readiness == 'Ready'
-                          ? "🟢 Ready"
-                          : readiness == 'Needs Information'
-                              ? "🟡 Needs Information"
-                              : "🔴 Cannot Match",
-                      style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: CRMSpacing.m),
-
+          // Scores Card removed
           // Warnings List
           if (warnings.isNotEmpty) ...[
             Text("Missing Requirements Details:", style: CRMTypography.bodyMedium.copyWith(color: CRMColors.danger, fontWeight: FontWeight.bold)),

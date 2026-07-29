@@ -109,6 +109,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   final UsersRepository _usersRepository;
   final AuthBloc? _authBloc;
   List<RoleModel> _cachedRoles = [];
+  List<UserModel> _cachedUsers = [];
 
   UsersBloc({
     required UsersRepository usersRepository,
@@ -154,9 +155,11 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         roleId: event.roleId,
         status: event.status,
       );
+      _cachedUsers = users;
       emit(UsersLoaded(users: users, roles: _cachedRoles));
     } catch (e) {
       emit(UsersError(message: e.toString()));
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
     }
   }
 
@@ -173,7 +176,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     CreateUserRequested event,
     Emitter<UsersState> emit,
   ) async {
-    emit(UsersLoading());
     try {
       if (_cachedRoles.isEmpty) {
         _cachedRoles = await _usersRepository.getRoles();
@@ -185,12 +187,14 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
       );
       if (denial != null) {
         emit(UsersError(message: denial));
+        emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
         return;
       }
       await _usersRepository.createUser(event.userData);
       emit(const UsersOperationSuccess(message: "User created successfully."));
     } catch (e) {
       emit(UsersError(message: e.toString()));
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
     }
   }
 
@@ -198,7 +202,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     UpdateUserRequested event,
     Emitter<UsersState> emit,
   ) async {
-    emit(UsersLoading());
     try {
       if (_cachedRoles.isEmpty) {
         _cachedRoles = await _usersRepository.getRoles();
@@ -210,12 +213,14 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
       );
       if (denial != null) {
         emit(UsersError(message: denial));
+        emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
         return;
       }
       await _usersRepository.updateUser(event.id, event.userData);
       emit(const UsersOperationSuccess(message: "User updated successfully."));
     } catch (e) {
       emit(UsersError(message: e.toString()));
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
     }
   }
 
@@ -223,16 +228,17 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     ToggleUserStatusRequested event,
     Emitter<UsersState> emit,
   ) async {
-    emit(UsersLoading());
     try {
       if (!RoleGuard.canManageEmployees(_callerRole)) {
         emit(const UsersError(message: 'You do not have permission to manage employees.'));
+        emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
         return;
       }
       await _usersRepository.toggleUserStatus(event.id, event.isActive);
       emit(const UsersOperationSuccess(message: "User status updated."));
     } catch (e) {
       emit(UsersError(message: e.toString()));
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
     }
   }
 
@@ -240,16 +246,17 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     DeleteUserRequested event,
     Emitter<UsersState> emit,
   ) async {
-    emit(UsersLoading());
     try {
       if (!RoleGuard.canManageEmployees(_callerRole)) {
         emit(const UsersError(message: 'You do not have permission to manage employees.'));
+        emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
         return;
       }
       await _usersRepository.deleteUser(event.id);
       emit(const UsersOperationSuccess(message: "User deleted successfully."));
     } catch (e) {
       emit(UsersError(message: e.toString()));
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
     }
   }
 }

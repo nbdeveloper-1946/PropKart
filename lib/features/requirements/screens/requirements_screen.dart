@@ -28,6 +28,8 @@ import '../../../core/api/dio_client.dart';
 import '../../../core/utils/budget_formatter.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/models/user_model.dart';
+import '../../users/bloc/users_bloc.dart';
+import '../../users/models/user_model.dart' as users_model;
 import '../../../core/config/app_config.dart';
 
 /// WhatsApp brand green — kept as a distinct constant for brand recognition.
@@ -129,9 +131,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
     context.read<RequirementsBloc>().add(
       FetchRequirementsEvent(
-        search: _activeMainTab == 'My Won'
-            ? _wonSearchController.text.trim()
-            : _searchController.text.trim(),
+        search: null,
         configurationId: configId,
         propertyTypeId: propTypeId,
         status: statusForFetch,
@@ -392,7 +392,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
               // Main View Tabs (Requirements vs Follow-ups vs My Won)
               Container(
-                height: 44,
+                height: 48,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: CRMColors.cardBg,
@@ -452,6 +452,27 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 "Manage buyer requirements and run listing match iterations",
                 style: CRMTypography.body.copyWith(color: CRMColors.textSecondary),
               ),
+              const SizedBox(height: CRMSpacing.s),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  height: 48,
+                  width: 240,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: CRMColors.background,
+                    borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                    border: Border.all(color: CRMColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildListingTabButton('Rent')),
+                      const SizedBox(width: 4),
+                      Expanded(child: _buildListingTabButton('Re-Sale')),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: CRMSpacing.m),
               SizedBox(
                 width: double.infinity,
@@ -479,6 +500,27 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   Text(
                     "Manage buyer requirements and run listing match iterations",
                     style: CRMTypography.body.copyWith(color: CRMColors.textSecondary),
+                  ),
+                  const SizedBox(height: CRMSpacing.s),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      height: 48,
+                      width: 240,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: CRMColors.background,
+                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+                        border: Border.all(color: CRMColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(child: _buildListingTabButton('Rent')),
+                          const SizedBox(width: 4),
+                          Expanded(child: _buildListingTabButton('Re-Sale')),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -600,7 +642,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       borderSide: BorderSide(color: CRMColors.border),
                     ),
                   ),
-                  onChanged: (val) => _triggerFetch(),
+                  onChanged: (val) {
+                    setState(() {});
+                  },
                 ),
               ),
               const SizedBox(width: CRMSpacing.s),
@@ -612,39 +656,6 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Rent / Re-Sale Toggle Tabs
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: CRMColors.background,
-                          borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                          border: Border.all(color: CRMColors.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildListingTabButton('Rent'),
-                            const SizedBox(width: 4),
-                            _buildListingTabButton('Re-Sale'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: CRMSpacing.s),
-                    _buildDropdownFilter<String?>(
-                      label: configDropdownLabel,
-                      value: _selectedConfigId,
-                      items: specDropdownItems,
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedConfigId = val);
-                        _triggerFetch();
-                      },
-                    ),
-                    const SizedBox(height: CRMSpacing.s),
                     _buildDropdownFilter<String?>(
                       label: 'Category',
                       value: _selectedCategoryId,
@@ -658,6 +669,17 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           _selectedCategoryId = val;
                           _selectedConfigId = null;
                         });
+                        _triggerFetch();
+                      },
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    _buildDropdownFilter<String?>(
+                      label: configDropdownLabel,
+                      value: _selectedConfigId,
+                      items: specDropdownItems,
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedConfigId = val);
                         _triggerFetch();
                       },
                     ),
@@ -679,22 +701,6 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       isMobile: isMobile,
                       onChanged: (val) {
                         setState(() => _selectedStatus = val ?? "All");
-                        _triggerFetch();
-                      },
-                    ),
-                    const SizedBox(height: CRMSpacing.s),
-                    _buildDropdownFilter(
-                      label: 'Matching Readiness',
-                      value: _selectedReadiness,
-                      items: const [
-                        DropdownMenuItem(value: "All", child: Text("All")),
-                        DropdownMenuItem(value: "Ready", child: Text("Ready")),
-                        DropdownMenuItem(value: "Needs Information", child: Text("Needs Info")),
-                        DropdownMenuItem(value: "Cannot Match", child: Text("Cannot Match")),
-                      ],
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedReadiness = val ?? "All");
                         _triggerFetch();
                       },
                     ),
@@ -711,34 +717,6 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   runSpacing: CRMSpacing.s,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    // Rent / Re-Sale Toggle Tabs
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: CRMColors.background,
-                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                        border: Border.all(color: CRMColors.border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildListingTabButton('Rent'),
-                          const SizedBox(width: 4),
-                          _buildListingTabButton('Re-Sale'),
-                        ],
-                      ),
-                    ),
-                    _buildDropdownFilter<String?>(
-                      label: configDropdownLabel,
-                      value: _selectedConfigId,
-                      items: specDropdownItems,
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedConfigId = val);
-                        _triggerFetch();
-                      },
-                    ),
                     _buildDropdownFilter<String?>(
                       label: 'Category',
                       value: _selectedCategoryId,
@@ -752,6 +730,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           _selectedCategoryId = val;
                           _selectedConfigId = null;
                         });
+                        _triggerFetch();
+                      },
+                    ),
+                    _buildDropdownFilter<String?>(
+                      label: configDropdownLabel,
+                      value: _selectedConfigId,
+                      items: specDropdownItems,
+                      isMobile: isMobile,
+                      onChanged: (val) {
+                        setState(() => _selectedConfigId = val);
                         _triggerFetch();
                       },
                     ),
@@ -772,21 +760,6 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       isMobile: isMobile,
                       onChanged: (val) {
                         setState(() => _selectedStatus = val ?? "All");
-                        _triggerFetch();
-                      },
-                    ),
-                    _buildDropdownFilter(
-                      label: 'Matching Readiness',
-                      value: _selectedReadiness,
-                      items: const [
-                        DropdownMenuItem(value: "All", child: Text("All")),
-                        DropdownMenuItem(value: "Ready", child: Text("Ready")),
-                        DropdownMenuItem(value: "Needs Information", child: Text("Needs Info")),
-                        DropdownMenuItem(value: "Cannot Match", child: Text("Cannot Match")),
-                      ],
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedReadiness = val ?? "All");
                         _triggerFetch();
                       },
                     ),
@@ -815,6 +788,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       child: AnimatedContainer(
         duration: CRMMotion.fast,
         curve: CRMMotion.easeInOut,
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.xs),
         decoration: BoxDecoration(
           color: isSelected ? CRMColors.primary : Colors.transparent,
@@ -869,6 +843,34 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     );
   }
 
+  String _getSalesmanName(RequirementModel req, UserModel? currentUser) {
+    if (req.creatorName != null && req.creatorName!.isNotEmpty) {
+      return req.creatorName!;
+    }
+    if (req.assigneeName != null && req.assigneeName!.isNotEmpty) {
+      return req.assigneeName!;
+    }
+    
+    if (currentUser != null && req.adminId == currentUser.id) {
+      return currentUser.fullName;
+    }
+    
+    try {
+      final usersState = context.read<UsersBloc>().state;
+      if (usersState is UsersLoaded) {
+        final match = usersState.users.firstWhere(
+          (u) => u.id == req.adminId,
+          orElse: () => const users_model.UserModel(id: '', roleId: '', roleName: '', fullName: '', email: '', isActive: false),
+        );
+        if (match.fullName.isNotEmpty) {
+          return match.fullName;
+        }
+      }
+    } catch (_) {}
+
+    return 'N/A';
+  }
+
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
     if (currentUser == null) return true;
     if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') return true;
@@ -889,7 +891,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
         List<RequirementModel> requirements = [];
 
         if (state is RequirementsLoaded) {
+          final query = _searchController.text.trim().toLowerCase();
           requirements = state.requirements.where((r) {
+            if (currentUser != null && currentUser.role == 'Sales') {
+              final isOwnRequirement = r.adminId == currentUser.id ||
+                  r.creatorName == currentUser.fullName ||
+                  r.assigneeName == currentUser.fullName;
+              if (!isOwnRequirement) return false;
+            }
+
             final matchesListingType = getListingTypeLabel(r) == _activeListingTab;
             final matchesCategory = _selectedCategoryId == null || r.categoryId == _selectedCategoryId;
             final matchesSpec = _selectedConfigId == null ||
@@ -909,9 +919,30 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 r.status == _selectedStatus ||
                 mappedStatus == _selectedStatus;
 
-            final matchesReadiness = _selectedReadiness == "All" || r.matchingReadiness == _selectedReadiness;
+            bool matchesSearch = true;
+            if (query.isNotEmpty) {
+              final clientName = r.clientName.toLowerCase();
+              final clientMobile = r.clientMobile.toLowerCase();
+              final specs = '${r.propertyTypeName} ${r.configurationName ?? ""} ${r.listingTypeName ?? ""} ${r.categoryName ?? ""}'.toLowerCase();
+              final remarks = (r.remarks ?? '').toLowerCase();
+              final areas = r.areaNames.join(' ').toLowerCase();
+              
+              bool matchesSalesman = false;
+              if (currentUser != null && (currentUser.role == 'Admin' || currentUser.role == 'Super Admin')) {
+                final creator = (r.creatorName ?? '').toLowerCase();
+                final assignee = (r.assigneeName ?? '').toLowerCase();
+                matchesSalesman = creator.contains(query) || assignee.contains(query);
+              }
 
-            return matchesListingType && matchesCategory && matchesSpec && matchesStatus && matchesReadiness;
+              matchesSearch = clientName.contains(query) ||
+                  clientMobile.contains(query) ||
+                  specs.contains(query) ||
+                  remarks.contains(query) ||
+                  areas.contains(query) ||
+                  matchesSalesman;
+            }
+
+            return matchesListingType && matchesCategory && matchesSpec && matchesStatus && matchesSearch;
           }).toList();
           
           // Sort by recently updated/created (descending)
@@ -946,15 +977,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   emptyDescription: 'Try adjusting filters or create a new requirement pipeline.',
                   dataRowMinHeight: 56.0,
                   dataRowMaxHeight: 64.0,
-                  columns: const [
-                    DataColumn(label: Text('Client')),
-                    DataColumn(label: Text('Specs / Config')),
-                    DataColumn(label: Text('Budget Range')),
-                    DataColumn(label: Text('Target Area(s)')),
-                    DataColumn(label: Text('Status')),
-                    DataColumn(label: Text('Readiness')),
-                    DataColumn(label: Text('Matches')),
-                    DataColumn(label: Text('Actions')),
+                  columns: [
+                    const DataColumn(label: Text('Client')),
+                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                      const DataColumn(label: Text('Salesman')),
+                    const DataColumn(label: Text('Specs / Config')),
+                    const DataColumn(label: Text('Budget Range')),
+                    const DataColumn(label: Text('Target Area(s)')),
+                    const DataColumn(label: Text('Status')),
+                    const DataColumn(label: Text('Matches')),
+                    const DataColumn(label: Text('Actions')),
                   ],
                   rows: pageItems.map((req) {
                     final qualityColor = req.requirementQuality == 'High'
@@ -983,22 +1015,8 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(req.clientMobile, style: CRMTypography.caption.copyWith(color: CRMColors.textSecondary)),
-                              if (req.assigneeName != null || req.creatorName != null) ...[
-                                const SizedBox(height: 2),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.person_outline_rounded, size: 12, color: CRMColors.textMuted),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      req.assigneeName ?? req.creatorName ?? '',
-                                      style: CRMTypography.caption.copyWith(color: CRMColors.textMuted),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: 2),
                               if (req.nextFollowupDate != null) ...[
+                                const SizedBox(height: 2),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -1014,6 +1032,13 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             ],
                           ),
                         ),
+                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                          DataCell(
+                            Text(
+                              _getSalesmanName(req, currentUser),
+                              style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1107,64 +1132,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             ),
                           ),
                         ),
-                        DataCell(
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: req.matchingReadiness == 'Ready'
-                                          ? CRMColors.success
-                                          : req.matchingReadiness == 'Needs Information'
-                                              ? CRMColors.warning
-                                              : CRMColors.danger,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    req.matchingReadiness == 'Ready'
-                                        ? 'Ready'
-                                        : req.matchingReadiness == 'Needs Information'
-                                            ? 'Needs Info'
-                                            : 'Cannot Match',
-                                    style: CRMTypography.captionBold.copyWith(
-                                      fontSize: 12,
-                                      color: req.matchingReadiness == 'Ready'
-                                          ? CRMColors.success
-                                          : req.matchingReadiness == 'Needs Information'
-                                              ? CRMColors.warning
-                                              : CRMColors.danger,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Quality: ',
-                                    style: CRMTypography.caption.copyWith(color: CRMColors.textSecondary),
-                                  ),
-                                  Text(
-                                    req.requirementQuality,
-                                    style: CRMTypography.captionBold.copyWith(color: qualityColor),
-                                  ),
-                                  Text(
-                                    ' | Comp: ${(req.completenessScore * 100).toStringAsFixed(0)}%',
-                                    style: CRMTypography.caption.copyWith(color: CRMColors.textSecondary),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+
                         DataCell(
                           CRMButton(
                             label: "Run Matches",
@@ -1772,6 +1740,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       child: AnimatedContainer(
         duration: CRMMotion.fast,
         curve: CRMMotion.easeInOut,
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.xs),
         decoration: BoxDecoration(
           color: isSelected ? CRMColors.primary : Colors.transparent,
@@ -2261,11 +2230,24 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
     final table = BlocBuilder<RequirementsBloc, RequirementsState>(
       builder: (context, state) {
+        final authState = context.read<AuthBloc>().state;
+        UserModel? currentUser;
+        if (authState is Authenticated) {
+          currentUser = authState.user;
+        }
+
         final isLoading = state is RequirementsLoading || state is RequirementsInitial;
         List<RequirementModel> requirements = [];
 
         if (state is RequirementsLoaded) {
           requirements = state.requirements.where((r) {
+            if (currentUser != null && currentUser.role == 'Sales') {
+              final isOwnRequirement = r.adminId == currentUser.id ||
+                  r.creatorName == currentUser.fullName ||
+                  r.assigneeName == currentUser.fullName;
+              if (!isOwnRequirement) return false;
+            }
+
             final matchesListingType = getListingTypeLabel(r) == _activeListingTab;
             
             // Category filter
@@ -2277,16 +2259,23 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             if (query.isNotEmpty) {
               final name = r.clientName.toLowerCase();
               final mobile = r.clientMobile.toLowerCase();
-              final code = r.requirementCode.toLowerCase();
-              final specs = '${r.propertyTypeName} ${r.configurationName ?? ""}'.toLowerCase();
+              final specs = '${r.propertyTypeName} ${r.configurationName ?? ""} ${r.listingTypeName ?? ""} ${r.categoryName ?? ""}'.toLowerCase();
               final remarks = (r.remarks ?? '').toLowerCase();
               final areas = r.areaNames.join(' ').toLowerCase();
+              
+              bool matchesSalesman = false;
+              if (currentUser != null && (currentUser.role == 'Admin' || currentUser.role == 'Super Admin')) {
+                final creator = (r.creatorName ?? '').toLowerCase();
+                final assignee = (r.assigneeName ?? '').toLowerCase();
+                matchesSalesman = creator.contains(query) || assignee.contains(query);
+              }
+
               matchesSearch = name.contains(query) ||
                   mobile.contains(query) ||
-                  code.contains(query) ||
                   specs.contains(query) ||
                   remarks.contains(query) ||
-                  areas.contains(query);
+                  areas.contains(query) ||
+                  matchesSalesman;
             }
 
             // Strictly filter for Won status
@@ -2312,11 +2301,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             ? requirements.sublist(startIndex, endIndex)
             : <RequirementModel>[];
 
-        final authState = context.read<AuthBloc>().state;
-        UserModel? currentUser;
-        if (authState is Authenticated) {
-          currentUser = authState.user;
-        }
+
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -2335,15 +2320,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   emptyDescription: 'Requirements marked as "Won" will appear here.',
                   dataRowMinHeight: 56.0,
                   dataRowMaxHeight: 64.0,
-                  columns: const [
-                    DataColumn(label: Text('Client')),
-                    DataColumn(label: Text('Specs / Config')),
-                    DataColumn(label: Text('Budget Range')),
-                    DataColumn(label: Text('Target Area(s)')),
-                    DataColumn(label: Text('Status')),
-                    DataColumn(label: Text('Readiness')),
-                    DataColumn(label: Text('Matches')),
-                    DataColumn(label: Text('Actions')),
+                  columns: [
+                    const DataColumn(label: Text('Client')),
+                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                      const DataColumn(label: Text('Salesman')),
+                    const DataColumn(label: Text('Specs / Config')),
+                    const DataColumn(label: Text('Budget Range')),
+                    const DataColumn(label: Text('Target Area(s)')),
+                    const DataColumn(label: Text('Status')),
+                    const DataColumn(label: Text('Matches')),
+                    const DataColumn(label: Text('Actions')),
                   ],
                   rows: pageItems.map((req) {
                     final qualityColor = req.requirementQuality == 'High'
@@ -2375,6 +2361,13 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             ],
                           ),
                         ),
+                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                          DataCell(
+                            Text(
+                              _getSalesmanName(req, currentUser),
+                              style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -2468,47 +2461,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             ),
                           ),
                         ),
-                        DataCell(
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: req.matchingReadiness == 'Ready'
-                                          ? CRMColors.success
-                                          : req.matchingReadiness == 'Needs Information'
-                                              ? CRMColors.warning
-                                              : CRMColors.danger,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    req.matchingReadiness == 'Ready'
-                                        ? 'Ready'
-                                        : req.matchingReadiness == 'Needs Information'
-                                            ? 'Needs Info'
-                                            : 'Cannot Match',
-                                    style: CRMTypography.captionBold.copyWith(
-                                      fontSize: 12,
-                                      color: req.matchingReadiness == 'Ready'
-                                          ? CRMColors.success
-                                          : req.matchingReadiness == 'Needs Information'
-                                              ? CRMColors.warning
-                                              : CRMColors.danger,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+
                         DataCell(
                           CRMButton(
                             label: "Run Matches",

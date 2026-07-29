@@ -12,6 +12,11 @@ import '../models/property_model.dart';
 import '../services/properties_service.dart';
 import '../../requirements/models/requirement_model.dart';
 import '../../requirements/services/requirements_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/models/user_model.dart' as auth_model;
+import '../../users/repository/users_repository.dart';
+import '../../users/models/user_model.dart' as user_settings_model;
 
 class RecycleBinScreen extends StatefulWidget {
   const RecycleBinScreen({super.key});
@@ -31,6 +36,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   List<PropertyModel> _binProperties = [];
   List<RequirementModel> _binRequirements = [];
+  final Map<String, user_settings_model.UserModel> _usersMap = {};
 
   int _propertiesPerPage = 15;
   int _requirementsPerPage = 15;
@@ -94,13 +100,37 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
   Future<void> _fetchBinRequirements() async {
     setState(() => _isLoading = true);
     try {
+      if (_usersMap.isEmpty) {
+        try {
+          final usersList = await UsersRepository().getUsers();
+          for (var u in usersList) {
+            _usersMap[u.id] = u;
+          }
+        } catch (_) {}
+      }
+
       final res = _requirementsSubTab == 'Bin'
           ? await _requirementsService.getBinRequirements()
           : await _requirementsService.getRequirements(status: 'Not Interested');
       final data = res['data'] as Map<String, dynamic>? ?? {};
       final list = data['requirements'] as List? ?? [];
+
+      final authState = context.read<AuthBloc>().state;
+      auth_model.UserModel? currentUser;
+      if (authState is Authenticated) {
+        currentUser = authState.user;
+      }
+      final isSales = currentUser?.role?.toLowerCase() == 'sales';
+      final currentUserId = currentUser?.id;
+
+      List<RequirementModel> parsedList = list.map((r) => RequirementModel.fromJson(r)).toList();
+
+      if (isSales && currentUserId != null) {
+        parsedList = parsedList.where((r) => r.createdBy == currentUserId).toList();
+      }
+
       setState(() {
-        _binRequirements = list.map((r) => RequirementModel.fromJson(r)).toList();
+        _binRequirements = parsedList;
         _isLoading = false;
       });
     } catch (e) {
@@ -593,6 +623,15 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                               : 'Requirements marked as "Not Interested" will appear here.')
                           : Builder(
                               builder: (context) {
+                                final authState = context.read<AuthBloc>().state;
+                                auth_model.UserModel? currentUser;
+                                if (authState is Authenticated) {
+                                  currentUser = authState.user;
+                                }
+                                final isUserAdminOrSuperAdmin = currentUser != null &&
+                                    (currentUser.role?.toLowerCase() == 'admin' ||
+                                        currentUser.role?.toLowerCase() == 'super admin');
+
                                 final totalItems = _binRequirements.length;
                                 final totalPages = (totalItems / _requirementsPerPage).ceil().clamp(1, double.infinity).toInt();
                                 final startIndex = (_currentRequirementsPage - 1) * _requirementsPerPage;
@@ -608,12 +647,14 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                       showCheckboxColumn: false,
                                       dataRowMinHeight: 56.0,
                                       dataRowMaxHeight: 64.0,
-                                      columns: const [
-                                        DataColumn(label: Text('Client Name')),
-                                        DataColumn(label: Text('Specs / Config')),
-                                        DataColumn(label: Text('Budget Range')),
-                                        DataColumn(label: Text('Target Area(s)')),
-                                        DataColumn(label: Text('Actions')),
+                                      columns: [
+                                        const DataColumn(label: Text('Client Name')),
+                                        const DataColumn(label: Text('Specs / Config')),
+                                        const DataColumn(label: Text('Budget Range')),
+                                        const DataColumn(label: Text('Target Area(s)')),
+                                        if (isUserAdminOrSuperAdmin)
+                                          const DataColumn(label: Text('Salesperson')),
+                                        const DataColumn(label: Text('Actions')),
                                       ],
                                       rows: paginatedRequirements.map((r) {
                                         final budgetRange = '${CRMCurrencyFormatter.formatShort(r.minBudget)} - ${CRMCurrencyFormatter.formatShort(r.maxBudget)}';
@@ -645,6 +686,29 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                                 ),
                                               ),
                                             ),
+                                            if (isUserAdminOrSuperAdmin)
+                                              DataCell(
+                                                Builder(
+                                                  builder: (context) {
+                                                    final salespersonName = r.creatorName ?? r.assigneeName ?? 'N/A';
+                                                    final mobile = r.creatorMobile ?? '';
+                                                    final email = r.creatorEmail ?? '';
+                                                    return Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Text(salespersonName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                        if (email.isNotEmpty || mobile.isNotEmpty)
+                                                          Text('${email.isNotEmpty ? email : "No email"} • ${mobile.isNotEmpty ? mobile : "No mobile"}',
+                                                              style: TextStyle(color: CRMColors.textMutedOf(context), fontSize: 11))
+                                                        else
+                                                          Text('No contact details',
+                                                              style: TextStyle(color: CRMColors.textMutedOf(context), fontSize: 11)),
+                                                      ],
+                                                    );
+                                                  }
+                                                )
+                                              ),
                                             DataCell(
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,

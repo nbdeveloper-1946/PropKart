@@ -30,6 +30,9 @@ class RequirementModel {
   final String? nextFollowupDate;
   final List<String> furnishingIds;
   final List<String> facingIds;
+  final String? createdBy;
+  final String? creatorMobile;
+  final String? creatorEmail;
 
   RequirementModel({
     required this.id,
@@ -63,6 +66,9 @@ class RequirementModel {
     this.nextFollowupDate,
     this.furnishingIds = const [],
     this.facingIds = const [],
+    this.createdBy,
+    this.creatorMobile,
+    this.creatorEmail,
   });
 
   factory RequirementModel.fromJson(Map<String, dynamic> json) {
@@ -165,10 +171,27 @@ class RequirementModel {
           : json['created_at'] != null
               ? DateTime.parse(json['created_at'])
               : DateTime.now(),
-      adminId: json['admin_id'] as String?,
+      adminId: (json['admin_id'] ?? json['adminId']) as String?,
       organizationId: json['organization_id'] as String?,
-      assigneeName: json['assigneeName'] ?? json['assignee_name'],
-      creatorName: json['creatorName'] ?? json['creator_name'],
+      assigneeName: () {
+        if (json['assigneeName'] != null) return json['assigneeName'] as String;
+        if (json['assignee_name'] != null) return json['assignee_name'] as String;
+        if (json['assignee'] is Map) {
+          return (json['assignee']['full_name'] ?? json['assignee']['fullName'] ?? json['assignee']['name']) as String?;
+        }
+        return null;
+      }(),
+      creatorName: () {
+        if (json['creatorName'] != null) return json['creatorName'] as String;
+        if (json['creator_name'] != null) return json['creator_name'] as String;
+        if (json['creator'] is Map) {
+          return (json['creator']['full_name'] ?? json['creator']['fullName'] ?? json['creator']['name']) as String?;
+        }
+        if (json['admin'] is Map) {
+          return (json['admin']['full_name'] ?? json['admin']['fullName'] ?? json['admin']['name']) as String?;
+        }
+        return null;
+      }(),
       nextFollowupDate: json['nextFollowupDate'] ?? json['next_followup_date'],
       furnishingIds: json['furnishingIds'] != null
           ? List<String>.from(json['furnishingIds'])
@@ -188,6 +211,9 @@ class RequirementModel {
                   : json['facing_type_id'] != null
                       ? [json['facing_type_id'].toString()]
                       : const [],
+      createdBy: (json['created_by'] ?? json['createdBy']) as String?,
+      creatorMobile: (json['creatorMobile'] ?? json['creator_mobile']) as String?,
+      creatorEmail: (json['creatorEmail'] ?? json['creator_email']) as String?,
     );
   }
 
@@ -222,6 +248,9 @@ class RequirementModel {
       'nextFollowupDate': nextFollowupDate,
       'furnishingIds': furnishingIds,
       'facingIds': facingIds,
+      'createdBy': createdBy,
+      'creatorMobile': creatorMobile,
+      'creatorEmail': creatorEmail,
     };
   }
 
@@ -366,6 +395,9 @@ class RequirementModel {
     String? nextFollowupDate,
     List<String>? furnishingIds,
     List<String>? facingIds,
+    String? createdBy,
+    String? creatorMobile,
+    String? creatorEmail,
   }) {
     return RequirementModel(
       id: id ?? this.id,
@@ -399,6 +431,9 @@ class RequirementModel {
       nextFollowupDate: nextFollowupDate ?? this.nextFollowupDate,
       furnishingIds: furnishingIds ?? this.furnishingIds,
       facingIds: facingIds ?? this.facingIds,
+      createdBy: createdBy ?? this.createdBy,
+      creatorMobile: creatorMobile ?? this.creatorMobile,
+      creatorEmail: creatorEmail ?? this.creatorEmail,
     );
   }
 }

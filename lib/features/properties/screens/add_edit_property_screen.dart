@@ -664,7 +664,57 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
 
   List<LookupItem> _getFilteredConfigs() {
     if (_selectedCategory == null) return [];
-    return widget.metadata.configurations.where((c) => c.categoryId == _selectedCategory).toList();
+    final category = widget.metadata.categories.firstWhere(
+      (cat) => cat.id == _selectedCategory,
+      orElse: () => LookupItem(id: '', name: ''),
+    );
+    final catName = category.name.toLowerCase();
+
+    return widget.metadata.configurations.where((c) {
+      final configName = c.name.toLowerCase();
+
+      if (catName.contains('commercial')) {
+        return configName.contains('office') ||
+            configName.contains('shop') ||
+            configName.contains('showroom');
+      } else if (catName.contains('land') || catName.contains('plot')) {
+        return configName.contains('plot');
+      } else if (catName.contains('industrial')) {
+        return configName.contains('warehouse') ||
+            configName.contains('shed') ||
+            configName.contains('industrial');
+      } else if (catName.contains('residential')) {
+        return !configName.contains('office') &&
+            !configName.contains('shop') &&
+            !configName.contains('showroom') &&
+            !configName.contains('plot') &&
+            !configName.contains('warehouse') &&
+            !configName.contains('shed') &&
+            !configName.contains('industrial');
+      }
+
+      return c.categoryId == _selectedCategory;
+    }).toList();
+  }
+
+  void _onConfigurationChanged(String? val) {
+    setState(() {
+      _selectedConfig = val;
+      if (val != null) {
+        final config = widget.metadata.configurations.firstWhere(
+          (c) => c.id == val,
+          orElse: () => LookupItem(id: '', name: ''),
+        );
+        final name = config.name.trim();
+        final match = RegExp(r'^(\d+)\s*(?:BHK|RK)', caseSensitive: false).firstMatch(name);
+        if (match != null) {
+          final bedroomsStr = match.group(1);
+          if (bedroomsStr != null) {
+            _bedroomsController.text = bedroomsStr;
+          }
+        }
+      }
+    });
   }
 
   void _onPriceChanged() {
@@ -1252,28 +1302,6 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
     return CRMCard(
       title: 'Basic Property Setup',
       subtitle: 'Complete listing definitions and categories',
-      headerAction: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Verified',
-            style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondaryOf(context)),
-          ),
-          const SizedBox(width: CRMSpacing.xs),
-          Transform.scale(
-            scale: 0.8,
-            child: Switch(
-              value: _isVerified,
-              activeColor: CRMColors.success,
-              onChanged: (val) {
-                setState(() {
-                  _isVerified = val;
-                });
-              },
-            ),
-          ),
-        ],
-      ),
       padding: isMobile ? const EdgeInsets.all(CRMSpacing.s) : const EdgeInsets.all(CRMSpacing.m),
       child: Column(
         children: [
@@ -1479,7 +1507,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                       const DropdownMenuItem(value: null, child: Text('None')),
                       ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
                     ],
-                    onChanged: (v) => setState(() => _selectedConfig = v),
+                    onChanged: _onConfigurationChanged,
                   ),
                 ),
                 const SizedBox(width: CRMSpacing.xs),
@@ -1533,7 +1561,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                             const DropdownMenuItem(value: null, child: Text('None')),
                             ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
                           ],
-                          onChanged: (v) => setState(() => _selectedConfig = v),
+                          onChanged: _onConfigurationChanged,
                         ),
                       ),
                       const SizedBox(width: CRMSpacing.xs),
@@ -1810,72 +1838,6 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
             ),
           ),
-          const SizedBox(height: CRMSpacing.m),
-          if (isMobile) ...[
-            TextFormField(
-              key: ValueKey('latitude_$_latitude'),
-              initialValue: _latitude?.toString() ?? '',
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-              decoration: InputDecoration(
-                labelText: 'Latitude',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-              ),
-              onChanged: (v) {
-                _latitude = double.tryParse(v);
-              },
-            ),
-            const SizedBox(height: CRMSpacing.m),
-            TextFormField(
-              key: ValueKey('longitude_$_longitude'),
-              initialValue: _longitude?.toString() ?? '',
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-              decoration: InputDecoration(
-                labelText: 'Longitude',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-              ),
-              onChanged: (v) {
-                _longitude = double.tryParse(v);
-              },
-            ),
-          ] else ...[
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    key: ValueKey('latitude_$_latitude'),
-                    initialValue: _latitude?.toString() ?? '',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-                    decoration: InputDecoration(
-                      labelText: 'Latitude',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-                    ),
-                    onChanged: (v) {
-                      _latitude = double.tryParse(v);
-                    },
-                  ),
-                ),
-                const SizedBox(width: CRMSpacing.s),
-                Expanded(
-                  child: TextFormField(
-                    key: ValueKey('longitude_$_longitude'),
-                    initialValue: _longitude?.toString() ?? '',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-                    decoration: InputDecoration(
-                      labelText: 'Longitude',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-                    ),
-                    onChanged: (v) {
-                      _longitude = double.tryParse(v);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

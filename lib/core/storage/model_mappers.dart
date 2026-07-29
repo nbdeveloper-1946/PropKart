@@ -220,6 +220,8 @@ extension RequirementLocalExtensions on RequirementLocal {
       organizationId: organizationId,
       listingTypeId: parsedListingTypeId,
       listingTypeName: parsedListingTypeName,
+      creatorName: creatorName,
+      assigneeName: assigneeName,
     );
   }
 }
@@ -251,7 +253,9 @@ extension RequirementModelExtensions on RequirementModel {
       ..adminId = adminId
       ..organizationId = organizationId
       ..listingTypeId = listingTypeId
-      ..listingTypeName = listingTypeName;
+      ..listingTypeName = listingTypeName
+      ..creatorName = creatorName
+      ..assigneeName = assigneeName;
   }
 }
 

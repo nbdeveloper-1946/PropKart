@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -22,6 +23,7 @@ import '../models/property_model.dart';
 import '../repository/properties_repository.dart';
 import 'add_edit_property_screen.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/utils/budget_formatter.dart';
 
 class PropertiesScreen extends StatefulWidget {
   final String? openPropertyId;
@@ -40,9 +42,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   bool _hasAutoOpenedAdd = false;
   bool _hasAutoOpenedProp = false;
   String? _selectedCategory;
+  String? _selectedConfiguration;
   String? _selectedArea;
   String? _selectedListingType;
   bool? _selectedVerification;
+  PropertyMetadataModel? _cachedMetadata;
+  String? _selectedPriceSortOrRange;
+  double? _minPrice;
+  double? _maxPrice;
   int _currentPage = 0;
   int _pageSize = 10;
 
@@ -64,11 +71,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   void _loadProperties() {
     context.read<PropertiesBloc>().add(
           LoadPropertiesEvent(
-            search: _searchController.text.trim(),
-            categoryId: _selectedCategory,
-            areaId: _selectedArea,
-            listingTypeId: _selectedListingType,
-            isVerified: _selectedVerification,
             activeTab: _activeTab,
           ),
         );
@@ -294,53 +296,12 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   spacing: CRMSpacing.m,
                   runSpacing: CRMSpacing.s,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Verified: ',
-                          style: CRMTypography.caption.copyWith(
-                              color: CRMColors.textSecondaryOf(context)),
-                        ),
-                        Transform.scale(
-                          scale: 0.8,
-                          child: Switch(
-                            value: p.isVerified,
-                            activeColor: CRMColors.success,
-                            onChanged: (val) {
-                              context.read<PropertiesBloc>().add(
-                                    ToggleVerificationEvent(p.id, val,
-                                        activeTab: _activeTab),
-                                  );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+                    const SizedBox.shrink(),
                     Wrap(
                       spacing: CRMSpacing.s,
                       runSpacing: CRMSpacing.xs,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        IconButton(
-                          icon: Icon(
-                            isBookmarked
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            color: isBookmarked
-                                ? CRMColors.warning
-                                : CRMColors.textMutedOf(context),
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () {
-                            context.read<PropertiesBloc>().add(
-                                  ToggleBookmarkEvent(p.id,
-                                      activeTab: _activeTab),
-                                );
-                          },
-                        ),
                         if (isMine && _activeTab != 'My Deleted') ...[
                           IconButton(
                             icon: Icon(Icons.edit_outlined,
@@ -407,6 +368,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       currentUserId = authState.user.id;
       currentUser = authState.user;
     }
+    final bool isUserAdminOrSuperAdmin = currentUser != null &&
+        (currentUser.role?.toLowerCase() == 'admin' || currentUser.role?.toLowerCase() == 'super admin');
     final double screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
@@ -450,15 +413,67 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
           if (state is PropertiesLoaded) {
             properties = state.properties.where((p) {
               final ltName = p.listingTypeName.toLowerCase();
-              if (_activeListingTab == 'Rent') {
-                return ltName.contains('rent');
-              } else {
-                return ltName.contains('sale') ||
-                    ltName.contains('resale') ||
-                    !ltName.contains('rent');
+              final matchesListing = _activeListingTab == 'Rent'
+                  ? ltName.contains('rent')
+                  : (ltName.contains('sale') ||
+                      ltName.contains('resale') ||
+                      !ltName.contains('rent'));
+
+              final matchesCategory = _selectedCategory == null ||
+                  p.categoryId == _selectedCategory;
+
+              final matchesConfig = _selectedConfiguration == null ||
+                  p.configurationId == _selectedConfiguration;
+
+              final matchesArea = _selectedArea == null ||
+                  p.areaId == _selectedArea;
+
+              bool matchesPrice = true;
+              if (_selectedPriceSortOrRange == 'custom') {
+                if (_minPrice != null && p.price < _minPrice!) {
+                  matchesPrice = false;
+                }
+                if (_maxPrice != null && p.price > _maxPrice!) {
+                  matchesPrice = false;
+                }
               }
+
+              bool matchesSearch = true;
+              if (_searchController.text.trim().isNotEmpty) {
+                final query = _searchController.text.trim().toLowerCase();
+                matchesSearch = p.propertyCode.toLowerCase().contains(query) ||
+                    p.title.toLowerCase().contains(query) ||
+                    (p.description?.toLowerCase().contains(query) ?? false) ||
+                    p.ownerName.toLowerCase().contains(query) ||
+                    p.ownerMobile.toLowerCase().contains(query) ||
+                    p.areaName.toLowerCase().contains(query) ||
+                    p.cityName.toLowerCase().contains(query) ||
+                    p.categoryName.toLowerCase().contains(query) ||
+                    (p.configurationName?.toLowerCase().contains(query) ?? false) ||
+                    p.propertyTypeName.toLowerCase().contains(query) ||
+                    (isUserAdminOrSuperAdmin && p.createdByName.toLowerCase().contains(query));
+              }
+
+              return matchesListing &&
+                  matchesCategory &&
+                  matchesConfig &&
+                  matchesArea &&
+                  matchesSearch &&
+                  matchesPrice;
             }).toList();
+
+            // Default sorting: Newest first (latest property appears first)
+            properties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+            // Price Sorting (Low to High / High to Low)
+            if (_selectedPriceSortOrRange == 'l2h') {
+              properties.sort((a, b) => a.price.compareTo(b.price));
+            } else if (_selectedPriceSortOrRange == 'h2l') {
+              properties.sort((a, b) => b.price.compareTo(a.price));
+            }
+
             metadata = state.metadata;
+            _cachedMetadata = state.metadata;
             bookmarkedIds = state.bookmarkedIds;
 
             final action =
@@ -517,15 +532,40 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Responsive Page Header
-                _buildPageHeader(metadata),
+                _buildPageHeader(_cachedMetadata),
+                const SizedBox(height: CRMSpacing.m),
+
+                // Rent vs Re-Sale Toggle Tabs
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    height: 44,
+                    width: 240,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: CRMColors.backgroundOf(context),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                            child: _buildPropertyListingTabButton('Rent')),
+                        const SizedBox(width: 4),
+                        Expanded(
+                            child: _buildPropertyListingTabButton('Re-Sale')),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: CRMSpacing.l),
 
                 // 2. Statistics Row (Overflow Fixed Layout)
-                _buildStatisticsRow(properties),
+                _buildStatisticsRow(state is PropertiesLoaded ? state.properties : const []),
                 const SizedBox(height: CRMSpacing.l),
 
                 // 3. Search & 4. Advanced Filters
-                _buildSearchAndFilters(metadata),
+                _buildSearchAndFilters(_cachedMetadata),
                 const SizedBox(height: CRMSpacing.l),
 
                 // 5. Action Toolbar (Responsive choice chips)
@@ -577,6 +617,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     dataRowMaxHeight: 80.0,
                     columns: [
                       const DataColumn(label: Text('Code')),
+                      if (isUserAdminOrSuperAdmin)
+                        const DataColumn(label: Text('Listed By')),
                       const DataColumn(label: Text('Property Name')),
                       const DataColumn(label: Text('Owner')),
                       const DataColumn(label: Text('Area')),
@@ -585,7 +627,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                       const DataColumn(label: Text('Date')),
                       const DataColumn(label: Text('Status')),
                       const DataColumn(label: Text('Photos')),
-                      const DataColumn(label: Text('Shortlist')),
                       const DataColumn(label: Text('Actions')),
                     ],
                     rows: pagedProperties.map((p) {
@@ -605,6 +646,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                           DataCell(Text(p.propertyCode,
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold))),
+                          if (isUserAdminOrSuperAdmin)
+                            DataCell(Text(p.createdByName)),
                           DataCell(Text(p.title)),
                           DataCell(
                             Padding(
@@ -859,24 +902,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                             ),
                           ),
                           DataCell(
-                            IconButton(
-                              icon: Icon(
-                                isBookmarked
-                                    ? Icons.star_rounded
-                                    : Icons.star_border_rounded,
-                                color: isBookmarked
-                                    ? CRMColors.warning
-                                    : CRMColors.textMutedOf(context),
-                              ),
-                              onPressed: () {
-                                context.read<PropertiesBloc>().add(
-                                      ToggleBookmarkEvent(p.id,
-                                          activeTab: _activeTab),
-                                    );
-                              },
-                            ),
-                          ),
-                          DataCell(
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -991,11 +1016,19 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                 .bookmarkedIds
             : <String>{};
 
-    final verified = properties.where((p) => p.isVerified).length;
-    final active =
-        properties.where((p) => p.propertyStatusName == 'Available').length;
-    final shortlisted =
-        properties.where((p) => bookmarkedIds.contains(p.id)).length;
+    final filteredByListingTab = properties.where((p) {
+      final ltName = p.listingTypeName.toLowerCase();
+      if (_activeListingTab == 'Rent') {
+        return ltName.contains('rent');
+      } else {
+        return ltName.contains('sale') ||
+            ltName.contains('resale') ||
+            !ltName.contains('rent');
+      }
+    }).toList();
+
+    final active = filteredByListingTab
+        .where((p) => p.propertyStatusName == 'Available').length;
 
     final double screenWidth = MediaQuery.of(context).size.width;
 
@@ -1005,33 +1038,66 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
           value: '$active',
           icon: Icons.bolt_rounded,
           iconColor: CRMColors.primaryOf(context)),
-      CRMKPICard(
-          title: 'Verified listings',
-          value: '$verified',
-          icon: Icons.verified_user_outlined,
-          iconColor: CRMColors.success),
-      CRMKPICard(
-          title: 'Shortlisted listings',
-          value: '$shortlisted',
-          icon: Icons.star_outline_rounded,
-          iconColor: CRMColors.warning),
     ];
 
-    final int crossAxisCount = screenWidth >= 1000 ? cards.length : 2;
-    final double childAspectRatio =
-        screenWidth >= 1000 ? (cards.length == 4 ? 2.2 : 2.5) : 1.5;
+    bool isBhkCategory(PropertyModel p) {
+      final catName = p.categoryName.toLowerCase();
+      return !catName.contains('commercial') &&
+          !catName.contains('industrial') &&
+          !catName.contains('land') &&
+          !catName.contains('plot');
+    }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: CRMSpacing.m,
-        mainAxisSpacing: CRMSpacing.m,
-        childAspectRatio: childAspectRatio,
+    final Map<int, Color> bhkColors = {
+      1: CRMColors.info,
+      2: CRMColors.success,
+      3: CRMColors.warning,
+      4: CRMColors.danger,
+      5: CRMColors.primaryOf(context),
+    };
+
+    for (int bhk = 1; bhk <= 5; bhk++) {
+      final count = filteredByListingTab
+          .where((p) =>
+              isBhkCategory(p) &&
+              ((p.configurationName != null &&
+                      p.configurationName!
+                          .toLowerCase()
+                          .startsWith('$bhk bhk')) ||
+                  (p.configurationName == null && p.bedrooms == bhk)))
+          .length;
+      if (count > 0) {
+        cards.add(
+          CRMKPICard(
+            title: '$bhk BHK',
+            value: '$count',
+            icon: Icons.king_bed_outlined,
+            iconColor: bhkColors[bhk] ?? CRMColors.primaryOf(context),
+          ),
+        );
+      }
+    }
+
+    final bool isMobile = screenWidth < 600;
+
+    final double cardWidth = isMobile
+        ? (screenWidth - (CRMSpacing.m * 2) - CRMSpacing.m).clamp(0.0, double.infinity) / 2
+        : 180.0;
+    final double cardHeight = isMobile ? 105.0 : 120.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: CRMSpacing.xs),
+      child: Wrap(
+        spacing: CRMSpacing.m,
+        runSpacing: CRMSpacing.m,
+        children: cards
+            .map((card) => SizedBox(
+                  width: cardWidth,
+                  height: cardHeight,
+                  child: card,
+                ))
+            .toList(),
       ),
-      itemCount: cards.length,
-      itemBuilder: (context, index) => cards[index],
     );
   }
 
@@ -1095,7 +1161,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
             ),
             const SizedBox(height: CRMSpacing.m),
 
-            // Filters Dropdowns Grid
             LayoutBuilder(
               builder: (context, constraints) {
                 final double width = constraints.maxWidth;
@@ -1109,30 +1174,46 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   targetWidth = width;
                 }
 
+                final configurations = metadata != null
+                    ? metadata.configurations.where((c) {
+                        if (_selectedCategory == null) return true;
+
+                        final cat = categories.firstWhere(
+                          (cat) => cat.id == _selectedCategory,
+                          orElse: () => LookupItem(id: '', name: ''),
+                        );
+                        final catName = cat.name.toLowerCase();
+                        final configName = c.name.toLowerCase();
+
+                        if (catName.contains('residential')) {
+                          return configName == '1 rk' ||
+                              configName == '1 bhk' ||
+                              configName == '2 bhk' ||
+                              configName == '3 bhk' ||
+                              configName == '4 bhk' ||
+                              configName == '5 bhk' ||
+                              configName == 'villa' ||
+                              configName == 'duplex' ||
+                              configName == 'penthouse';
+                        } else if (catName.contains('commercial')) {
+                          return configName == 'office' ||
+                              configName == 'shop' ||
+                              configName == 'showroom';
+                        } else if (catName.contains('land') || catName.contains('plot')) {
+                          return configName == 'plot';
+                        } else if (catName.contains('industrial')) {
+                          return configName == 'warehouse' ||
+                              configName == 'industrial shed';
+                        }
+
+                        return c.categoryId == _selectedCategory;
+                      }).toList()
+                    : <LookupItem>[];
+
                 return Wrap(
                   spacing: CRMSpacing.m,
                   runSpacing: CRMSpacing.m,
                   children: [
-                    // Rent vs Sale/Re-Sale Toggle Tabs
-                    Container(
-                      height: 48,
-                      width: targetWidth,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: CRMColors.backgroundOf(context),
-                        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 0.5),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                              child: _buildPropertyListingTabButton('Rent')),
-                          const SizedBox(width: 4),
-                          Expanded(
-                              child: _buildPropertyListingTabButton('Re-Sale')),
-                        ],
-                      ),
-                    ),
                     _buildDropdown(
                       label: 'Category',
                       value: _selectedCategory,
@@ -1143,6 +1224,23 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedCategory = val;
+                          _selectedConfiguration = null;
+                          _currentPage = 0;
+                        });
+                        _loadProperties();
+                      },
+                      width: targetWidth,
+                    ),
+                    _buildDropdown(
+                      label: 'Configuration',
+                      value: _selectedConfiguration,
+                      items: configurations
+                          .map((c) => DropdownMenuItem<String>(
+                              value: c.id, child: Text(c.name)))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedConfiguration = val;
                           _currentPage = 0;
                         });
                         _loadProperties();
@@ -1165,7 +1263,42 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                       },
                       width: targetWidth,
                     ),
-                    _buildVerificationDropdown(targetWidth),
+                    _buildDropdown(
+                      label: 'Price Range',
+                      value: _selectedPriceSortOrRange,
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: 'l2h',
+                          child: Text('Low to High'),
+                        ),
+                        const DropdownMenuItem<String>(
+                          value: 'h2l',
+                          child: Text('High to Low'),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'custom',
+                          child: Text(
+                            _minPrice != null || _maxPrice != null
+                                ? 'Custom: ₹${_minPrice != null ? BudgetFormatter.format(_minPrice!) : '0'} - ₹${_maxPrice != null ? BudgetFormatter.format(_maxPrice!) : 'Max'}'
+                                : 'Custom Range...',
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val == 'custom') {
+                          _showCustomPriceRangeDialog();
+                        } else {
+                          setState(() {
+                            _selectedPriceSortOrRange = val;
+                            _minPrice = null;
+                            _maxPrice = null;
+                            _currentPage = 0;
+                          });
+                          _loadProperties();
+                        }
+                      },
+                      width: targetWidth,
+                    ),
                     SizedBox(
                       width: targetWidth,
                       height: 48,
@@ -1199,14 +1332,15 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         curve: CRMMotion.easeOut,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? CRMColors.primaryOf(context) : Colors.transparent,
-          borderRadius: BorderRadius.circular(CRMBorderRadius.xs),
+          color: isSelected ? const Color(0xFF64826F) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
-          style: CRMTypography.captionBold.copyWith(
-            color: isSelected ? Colors.white : CRMColors.textSecondaryOf(context),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          style: TextStyle(
+            fontSize: 14,
+            color: isSelected ? Colors.white : const Color(0xFF6B7280),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
           ),
         ),
       ),
@@ -1217,13 +1351,121 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     setState(() {
       _searchController.clear();
       _selectedCategory = null;
+      _selectedConfiguration = null;
       _selectedArea = null;
       _selectedListingType = null;
       _selectedVerification = null;
       _activeListingTab = 'Rent';
+      _selectedPriceSortOrRange = null;
+      _minPrice = null;
+      _maxPrice = null;
       _currentPage = 0;
     });
     _loadProperties();
+  }
+
+  Future<void> _showCustomPriceRangeDialog() async {
+    final previousSelection = _selectedPriceSortOrRange;
+    final minController = TextEditingController(
+      text: _minPrice != null ? _minPrice!.toStringAsFixed(0) : '',
+    );
+    final maxController = TextEditingController(
+      text: _maxPrice != null ? _maxPrice!.toStringAsFixed(0) : '',
+    );
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String? getMinHelperText() {
+              if (minController.text.trim().isEmpty) return null;
+              final parsed = BudgetFormatter.parse(minController.text);
+              if (parsed <= 0) return null;
+              return 'Formatted: ₹${BudgetFormatter.format(parsed)}';
+            }
+
+            String? getMaxHelperText() {
+              if (maxController.text.trim().isEmpty) return null;
+              final parsed = BudgetFormatter.parse(maxController.text);
+              if (parsed <= 0) return null;
+              return 'Formatted: ₹${BudgetFormatter.format(parsed)}';
+            }
+
+            return AlertDialog(
+              title: const Text('Custom Price Range'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: minController,
+                    keyboardType: TextInputType.text,
+                    onChanged: (val) {
+                      setDialogState(() {});
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Min Price (e.g. 50000 or 50k)',
+                      prefixText: '₹',
+                      helperText: getMinHelperText(),
+                      helperStyle: TextStyle(
+                        color: CRMColors.success,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: CRMSpacing.m),
+                  TextField(
+                    controller: maxController,
+                    keyboardType: TextInputType.text,
+                    onChanged: (val) {
+                      setDialogState(() {});
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Max Price (e.g. 150000 or 1.5L)',
+                      prefixText: '₹',
+                      helperText: getMaxHelperText(),
+                      helperStyle: TextStyle(
+                        color: CRMColors.success,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedPriceSortOrRange = (previousSelection == 'custom' && (_minPrice != null || _maxPrice != null))
+                          ? 'custom'
+                          : (previousSelection == 'custom' ? null : previousSelection);
+                    });
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final minVal = BudgetFormatter.parse(minController.text);
+                    final maxVal = BudgetFormatter.parse(maxController.text);
+                    setState(() {
+                      _minPrice = minVal > 0 ? minVal : null;
+                      _maxPrice = maxVal > 0 ? maxVal : null;
+                      _selectedPriceSortOrRange = (_minPrice != null || _maxPrice != null) ? 'custom' : null;
+                      _currentPage = 0;
+                    });
+                    _loadProperties();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildVerificationDropdown(double width) {
@@ -1372,66 +1614,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   }
 
   Widget _buildActionToolbar() {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
-    final chipsList = Wrap(
-      spacing: CRMSpacing.s,
-      runSpacing: CRMSpacing.xs,
-      children: ['All', 'Shortlisted'].map((tab) {
-        final isSelected = _activeTab == tab;
-        return ChoiceChip(
-          label: Text(tab),
-          selected: isSelected,
-          selectedColor: CRMColors.primaryOf(context).withOpacity(0.12),
-          labelStyle: TextStyle(
-            color: isSelected ? CRMColors.primaryOf(context) : CRMColors.textOf(context),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
-          ),
-          onSelected: (val) {
-            if (val) {
-              setState(() {
-                _activeTab = tab;
-                _currentPage = 0;
-              });
-              _loadProperties();
-            }
-          },
-        );
-      }).toList(),
-    );
-
     final refreshButton = IconButton(
       icon: Icon(Icons.refresh_rounded, color: CRMColors.textSecondaryOf(context)),
       onPressed: _loadProperties,
     );
 
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Filter Views',
-                  style: CRMTypography.bodyMedium
-                      .copyWith(fontWeight: FontWeight.bold)),
-              refreshButton,
-            ],
-          ),
-          const SizedBox(height: CRMSpacing.xs),
-          chipsList,
-        ],
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(child: chipsList),
-        refreshButton,
-      ],
+    return Align(
+      alignment: Alignment.centerRight,
+      child: refreshButton,
     );
   }
 
@@ -1506,6 +1696,9 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       return p.plotArea != null && p.plotArea! > 0
           ? '${p.plotArea!.toStringAsFixed(0)} Sq.Ft'
           : 'N/A';
+    }
+    if (p.configurationName != null && p.configurationName!.trim().isNotEmpty) {
+      return p.configurationName!;
     }
     return '${p.bedrooms} BHK';
   }
