@@ -2533,6 +2533,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                                 _showAddEditDialog(req);
                               } else if (action == 'delete') {
                                 _showDeleteConfirmDialog(req);
+                              } else if (action == 'upload_doc') {
+                                final isRent = req.listingTypeName?.toLowerCase().contains('rent') ?? false;
+                                context.go(
+                                  isRent ? '/rental-library' : '/resale-library',
+                                  extra: {
+                                    'autoOpenUpload': true,
+                                    'clientName': req.clientName,
+                                  },
+                                );
                               }
                             },
                             itemBuilder: (context) => [
@@ -2543,6 +2552,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                                     Icon(Icons.info_outline_rounded, size: 18),
                                     SizedBox(width: 8),
                                     Text('View Details'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'upload_doc',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.upload_file_rounded, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Upload Document'),
                                   ],
                                 ),
                               ),

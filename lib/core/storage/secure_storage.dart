@@ -20,7 +20,7 @@ class SecureStorage {
   Future<void> saveToken(String token, {bool persist = true}) async {
     inMemoryToken = token;
     await _storage.delete(key: _tokenKey);
-    if (kIsWeb) {
+    if (kIsWeb && !kDebugMode) {
       return;
     }
     if (persist) {
@@ -31,7 +31,7 @@ class SecureStorage {
   Future<void> saveRefreshToken(String? refreshToken, {bool persist = true}) async {
     inMemoryRefreshToken = refreshToken;
     await _storage.delete(key: _refreshTokenKey);
-    if (kIsWeb) {
+    if (kIsWeb && !kDebugMode) {
       // Refresh stays in HttpOnly cookie on web — do not persist to JS storage.
       inMemoryRefreshToken = null;
       return;
@@ -60,11 +60,11 @@ class SecureStorage {
   }
 
   Future<String?> getToken() async {
-    return inMemoryToken ?? (kIsWeb ? null : await _storage.read(key: _tokenKey));
+    return inMemoryToken ?? (kIsWeb && !kDebugMode ? null : await _storage.read(key: _tokenKey));
   }
 
   Future<String?> getRefreshToken() async {
-    if (kIsWeb) return null;
+    if (kIsWeb && !kDebugMode) return null;
     return inMemoryRefreshToken ?? await _storage.read(key: _refreshTokenKey);
   }
 

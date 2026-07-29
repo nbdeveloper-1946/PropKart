@@ -27,7 +27,7 @@ class AuthRepository {
         persistHint: rememberMe,
       );
       if (user.token != null && user.token!.isNotEmpty) {
-        await _secureStorage.saveToken(user.token!, persist: false);
+        await _secureStorage.saveToken(user.token!, persist: rememberMe);
       }
       return user.copyWith(token: null);
     }

@@ -27,6 +27,10 @@ import '../network/sync_manager.dart';
 import '../../features/requirements/screens/share_properties_page.dart';
 import '../../features/requirements/screens/public_property_detail_screen.dart';
 import '../security/role_guard.dart';
+import '../../features/library/screens/library_main_screen.dart';
+import '../../features/library/screens/rental_library_screen.dart';
+import '../../features/library/screens/resale_library_screen.dart';
+import '../../features/library/screens/service_agent_library_screen.dart';
 
 
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -129,6 +133,26 @@ class AppRouter {
             path: '/bin',
             builder: (context, state) => const RecycleBinScreen(),
           ),
+          GoRoute(
+            path: '/library',
+            builder: (context, state) => const LibraryMainScreen(),
+          ),
+          GoRoute(
+            path: '/rental-library',
+            builder: (context, state) => RentalLibraryScreen(
+              initialArgs: state.extra as Map<String, dynamic>?,
+            ),
+          ),
+          GoRoute(
+            path: '/resale-library',
+            builder: (context, state) => ResaleLibraryScreen(
+              initialArgs: state.extra as Map<String, dynamic>?,
+            ),
+          ),
+          GoRoute(
+            path: '/service-agent-library',
+            builder: (context, state) => const ServiceAgentLibraryScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -174,7 +198,7 @@ class AppRouter {
           return '/dashboard';
         }
 
-        if (loggingIn) {
+        if (loggingIn || onGetStarted) {
           final from = state.uri.queryParameters['from'];
           return RoleGuard.sanitizeRedirectPath(from, role: role) ?? '/dashboard';
         }
@@ -190,14 +214,14 @@ class AppRouter {
 
       if (authState is Unauthenticated || authState is AuthError) {
         if (!isAuthGate) {
-          final target = state.matchedLocation;
+          final target = state.uri.toString();
           return '/get-started?from=${Uri.encodeComponent(target)}';
         }
         return null;
       }
 
       if (!isAuthGate) {
-        final target = state.matchedLocation;
+        final target = state.uri.toString();
         return '/splash?from=${Uri.encodeComponent(target)}';
       }
       return null;

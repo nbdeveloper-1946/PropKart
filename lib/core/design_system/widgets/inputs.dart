@@ -16,6 +16,7 @@ class CRMTextField extends StatelessWidget {
   final int? maxLength;
   final int? maxLines;
   final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
 
   const CRMTextField({
     super.key,
@@ -31,6 +32,7 @@ class CRMTextField extends StatelessWidget {
     this.maxLength,
     this.maxLines = 1,
     this.onChanged,
+    this.focusNode,
   });
 
   @override
@@ -48,6 +50,7 @@ class CRMTextField extends StatelessWidget {
         const SizedBox(height: CRMSpacing.xs),
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           obscureText: obscureText,
           readOnly: readOnly,

@@ -58,7 +58,7 @@ class RoleGuard {
     if (pathOnly.startsWith('/settings/audit-logs') && !canViewAuditLogs(role)) {
       return '/dashboard';
     }
-    return pathOnly;
+    return path;
   }
 
   /// Returns an error message if [callerRole] cannot create/update a user

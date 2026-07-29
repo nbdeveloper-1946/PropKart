@@ -90,5 +90,20 @@ void main() {
         '/dashboard',
       );
     });
+
+    test('sanitizeRedirectPath preserves query parameters and path parameters', () {
+      expect(
+        RoleGuard.sanitizeRedirectPath('/properties?openId=123', role: 'Sales'),
+        '/properties?openId=123',
+      );
+      expect(
+        RoleGuard.sanitizeRedirectPath('/properties/456', role: 'Sales'),
+        '/properties/456',
+      );
+      expect(
+        RoleGuard.sanitizeRedirectPath('/dashboard?foo=bar#baz', role: 'Sales'),
+        '/dashboard?foo=bar#baz',
+      );
+    });
   });
 }

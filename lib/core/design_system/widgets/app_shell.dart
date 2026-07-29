@@ -950,6 +950,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
                 _buildSidebarItem(Icons.assignment_rounded, 'Requirements', '/requirements', currentPath, isMobile, isExpanded),
                 if (userRole == 'Admin' || userRole == 'Super Admin')
                   _buildSidebarItem(Icons.people_outline_rounded, 'Employees', '/users', currentPath, isMobile, isExpanded),
+                _buildSidebarItem(Icons.folder_open_rounded, 'Library', '/library', currentPath, isMobile, isExpanded),
                 _buildSidebarItem(Icons.settings_rounded, 'Settings', '/settings', currentPath, isMobile, isExpanded),
                 _buildSidebarItem(Icons.delete_sweep_rounded, 'Recycle Bin', '/bin', currentPath, isMobile, isExpanded),
               ],
@@ -1176,9 +1177,20 @@ class _SidebarItem extends StatefulWidget {
 class _SidebarItemState extends State<_SidebarItem> {
   bool _isHovered = false;
 
+  bool _isRouteActive(String currentPath, String route) {
+    // For the Library sidebar item (/library), also highlight when on sub-routes
+    if (route == '/library') {
+      return currentPath == '/library' ||
+          currentPath.startsWith('/rental-library') ||
+          currentPath.startsWith('/resale-library') ||
+          currentPath.startsWith('/service-agent-library');
+    }
+    return currentPath.startsWith(route);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isSelected = widget.currentPath == widget.route;
+    final isSelected = _isRouteActive(widget.currentPath, widget.route);
     final isExpanded = widget.isSidebarExpanded || widget.isMobile;
 
     return Padding(

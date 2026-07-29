@@ -149,7 +149,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
       
       final authBloc = context.read<AuthBloc>();
-      final authState = authBloc.state;
+      var authState = authBloc.state;
+      if (authState is AuthInitial || authState is AuthLoading) {
+        authState = await authBloc.stream.firstWhere(
+          (state) => state is! AuthInitial && state is! AuthLoading,
+        );
+      }
+      if (!mounted) return;
 
       if (authState is Authenticated) {
         final userId = authState.user.id;
@@ -233,7 +239,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
     await _ensureMinSplashDelay();
     if (!mounted) return;
-    context.go('/get-started');
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    if (from != null && from.isNotEmpty) {
+      context.go('/get-started?from=${Uri.encodeComponent(from)}');
+    } else {
+      context.go('/get-started');
+    }
   }
 
   Future<void> _ensureMinSplashDelay() async {
