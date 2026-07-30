@@ -634,7 +634,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     columns: [
                       const DataColumn(label: Text('Code')),
                       if (isUserAdminOrSuperAdmin)
-                        const DataColumn(label: Text('Listed By')),
+                        const DataColumn(label: Text('Added By')),
                       const DataColumn(label: Text('Property Name')),
                       const DataColumn(label: Text('Owner')),
                       const DataColumn(label: Text('Area')),

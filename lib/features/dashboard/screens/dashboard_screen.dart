@@ -1337,7 +1337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return CRMCard(
       elevated: true,
-      title: isSiteVisitsTab ? "Site Visits" : "Scheduled",
+      title: "Scheduled",
       headerAction: isMobile ? null : dateSelection,
       child: Padding(
         padding: const EdgeInsets.only(top: CRMSpacing.m),

@@ -18,6 +18,8 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import '../../../core/storage/repository_coordinator.dart';
 import '../../../core/storage/isar_collections.dart';
+import '../../../features/properties/services/properties_service.dart';
+import '../../../features/properties/models/property_model.dart';
 
 class CRMAppShell extends StatefulWidget {
   final Widget child;
@@ -284,28 +286,136 @@ class _CRMAppShellState extends State<CRMAppShell> {
     try {
       final queryLower = query.toLowerCase();
 
-      // 1. Properties
+      final authState = context.read<AuthBloc>().state;
+      String? currentUserRole;
+      if (authState is Authenticated) {
+        currentUserRole = authState.user.role;
+      }
+      final bool isUserAdminOrSuperAdmin = currentUserRole == 'Admin' || currentUserRole == 'Super Admin';
+
+      // 1. Active Properties
       final props = await RepositoryCoordinator().propertyLocal.getProperties();
-      final matchedProps = props.where((p) =>
-        (p.title ?? '').toLowerCase().contains(queryLower) ||
-        (p.propertyCode ?? '').toLowerCase().contains(queryLower) ||
-        (p.ownerName ?? '').toLowerCase().contains(queryLower) ||
-        (p.ownerMobile ?? '').contains(queryLower) ||
-        (p.description?.toLowerCase().contains(queryLower) ?? false)
-      ).map((p) => {
+      final matchedProps = props.where((p) {
+        final code = (p.propertyCode ?? '').toLowerCase();
+        final name = (p.title ?? '').toLowerCase();
+        final ownerName = (p.ownerName ?? '').toLowerCase();
+        final ownerMobile = (p.ownerMobile ?? '').toLowerCase();
+        final area = (p.areaName ?? '').toLowerCase();
+        final bhk = (p.configurationName ?? '').toLowerCase();
+        final date = p.createdAt.toString().toLowerCase();
+        final status = (p.propertyStatusName ?? '').toLowerCase();
+        final superBuiltup = (p.superBuiltupArea?.toString() ?? '').toLowerCase();
+        final type = (p.propertyTypeName ?? '').toLowerCase();
+        final category = (p.categoryName ?? '').toLowerCase();
+        final remarks = (p.remarks ?? '').toLowerCase();
+        final description = (p.description ?? '').toLowerCase();
+        final salesman = (p.createdByName ?? '').toLowerCase();
+
+        final matchesGeneral = code.contains(queryLower) ||
+            name.contains(queryLower) ||
+            ownerName.contains(queryLower) ||
+            ownerMobile.contains(queryLower) ||
+            area.contains(queryLower) ||
+            bhk.contains(queryLower) ||
+            date.contains(queryLower) ||
+            status.contains(queryLower) ||
+            superBuiltup.contains(queryLower) ||
+            type.contains(queryLower) ||
+            category.contains(queryLower) ||
+            remarks.contains(queryLower) ||
+            description.contains(queryLower);
+
+        final matchesSalesman = isUserAdminOrSuperAdmin && salesman.contains(queryLower);
+
+        return matchesGeneral || matchesSalesman;
+      }).map((p) => {
         'id': p.id,
         'title': p.title,
         'property_code': p.propertyCode,
         'price': p.price,
+        'is_recycle_bin': false,
       }).toList();
+
+      // 1b. Recycle Bin / Deleted Properties
+      List<Map<String, dynamic>> matchedBinProps = [];
+      try {
+        final binRes = await PropertiesService().getBinProperties();
+        final binData = binRes['data'] as Map<String, dynamic>? ?? {};
+        final binList = binData['properties'] as List? ?? [];
+        final binProps = binList.map((p) => PropertyModel.fromJson(p)).toList();
+
+        matchedBinProps = binProps.where((p) {
+          final code = (p.propertyCode ?? '').toLowerCase();
+          final name = (p.title ?? '').toLowerCase();
+          final ownerName = (p.ownerName ?? '').toLowerCase();
+          final ownerMobile = (p.ownerMobile ?? '').toLowerCase();
+          final area = (p.areaName ?? '').toLowerCase();
+          final bhk = (p.configurationName ?? '').toLowerCase();
+          final date = p.createdAt.toString().toLowerCase();
+          final status = (p.propertyStatusName ?? '').toLowerCase();
+          final superBuiltup = (p.superBuiltupArea?.toString() ?? '').toLowerCase();
+          final type = (p.propertyTypeName ?? '').toLowerCase();
+          final category = (p.categoryName ?? '').toLowerCase();
+          final remarks = (p.remarks ?? '').toLowerCase();
+          final description = (p.description ?? '').toLowerCase();
+          final salesman = (p.createdByName ?? '').toLowerCase();
+
+          final matchesGeneral = code.contains(queryLower) ||
+              name.contains(queryLower) ||
+              ownerName.contains(queryLower) ||
+              ownerMobile.contains(queryLower) ||
+              area.contains(queryLower) ||
+              bhk.contains(queryLower) ||
+              date.contains(queryLower) ||
+              status.contains(queryLower) ||
+              superBuiltup.contains(queryLower) ||
+              type.contains(queryLower) ||
+              category.contains(queryLower) ||
+              remarks.contains(queryLower) ||
+              description.contains(queryLower);
+
+          final matchesSalesman = isUserAdminOrSuperAdmin && salesman.contains(queryLower);
+
+          return matchesGeneral || matchesSalesman;
+        }).map((p) => {
+          'id': p.id,
+          'title': '[In Recycle Bin] ${p.title}',
+          'property_code': p.propertyCode,
+          'price': p.price,
+          'is_recycle_bin': true,
+        }).toList();
+      } catch (_) {
+        // fail silently if bin fetch fails
+      }
+
+      final allMatchedProps = [...matchedProps, ...matchedBinProps];
 
       // 2. Requirements
       final reqs = await RepositoryCoordinator().requirementLocal.getRequirements();
-      final matchedReqs = reqs.where((r) =>
-        (r.clientName ?? '').toLowerCase().contains(queryLower) ||
-        (r.clientMobile ?? '').contains(queryLower) ||
-        (r.remarks?.toLowerCase().contains(queryLower) ?? false)
-      ).map((r) => {
+      final matchedReqs = reqs.where((r) {
+        final name = (r.clientName ?? '').toLowerCase();
+        final mobile = (r.clientMobile ?? '').toLowerCase();
+        final remarks = (r.remarks ?? '').toLowerCase();
+        final type = (r.propertyTypeName ?? '').toLowerCase();
+        final config = (r.configurationName ?? '').toLowerCase();
+        final category = (r.categoryName ?? '').toLowerCase();
+        final matchesArea = r.areaNames.any((name) => name.toLowerCase().contains(queryLower));
+        final salesmanCreator = (r.creatorName ?? '').toLowerCase();
+        final salesmanAssignee = (r.assigneeName ?? '').toLowerCase();
+
+        final matchesGeneral = name.contains(queryLower) ||
+            mobile.contains(queryLower) ||
+            remarks.contains(queryLower) ||
+            type.contains(queryLower) ||
+            config.contains(queryLower) ||
+            category.contains(queryLower) ||
+            matchesArea;
+
+        final matchesSalesman = isUserAdminOrSuperAdmin &&
+            (salesmanCreator.contains(queryLower) || salesmanAssignee.contains(queryLower));
+
+        return matchesGeneral || matchesSalesman;
+      }).map((r) => {
         'id': r.id,
         'customer_name': r.clientName,
         'mobile': r.clientMobile,
@@ -352,7 +462,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
       }).toList();
 
       setState(() {
-        _propertySuggestions = matchedProps;
+        _propertySuggestions = allMatchedProps;
         _requirementSuggestions = matchedReqs;
         _ownerSuggestions = matchedOwners;
         _builderSuggestions = matchedBuilders;
@@ -420,10 +530,16 @@ class _CRMAppShellState extends State<CRMAppShell> {
                                 ..._propertySuggestions.map((p) => _buildSuggestionTile(
                                       icon: Icons.business_rounded,
                                       title: p['title'] ?? '',
-                                      subtitle: 'Code: ${p['property_code']} • ₹${BudgetFormatter.format((p['price'] as num?)?.toDouble() ?? 0.0)}',
+                                      subtitle: p['is_recycle_bin'] == true
+                                          ? 'Code: ${p['property_code']} • ₹${BudgetFormatter.format((p['price'] as num?)?.toDouble() ?? 0.0)} • [In Recycle Bin]'
+                                          : 'Code: ${p['property_code']} • ₹${BudgetFormatter.format((p['price'] as num?)?.toDouble() ?? 0.0)}',
                                       onTap: () {
                                         _hideSearchOverlay();
-                                        context.go('/properties?openId=${p['id']}');
+                                        if (p['is_recycle_bin'] == true) {
+                                          context.go('/bin');
+                                        } else {
+                                          context.go('/properties?openId=${p['id']}');
+                                        }
                                       },
                                     )),
                               ],
