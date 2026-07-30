@@ -83,8 +83,33 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
       final res = await _propertiesService.getBinProperties();
       final data = res['data'] as Map<String, dynamic>? ?? {};
       final list = data['properties'] as List? ?? [];
+
+      final authState = context.read<AuthBloc>().state;
+      auth_model.UserModel? currentUser;
+      if (authState is Authenticated) {
+        currentUser = authState.user;
+      }
+
+      List<PropertyModel> parsedList = list.map((p) => PropertyModel.fromJson(p)).toList();
+
+      if (currentUser != null) {
+        final role = currentUser.role;
+        final currentUserId = currentUser.id;
+        final currentUserAdminId = currentUser.adminId;
+
+        if (role == 'Admin') {
+          parsedList = parsedList.where((p) =>
+            p.createdBy == currentUserId || p.adminId == currentUserId
+          ).toList();
+        } else if (role != 'Super Admin') {
+          parsedList = parsedList.where((p) =>
+            p.createdBy == currentUserId || (currentUserAdminId != null && p.adminId == currentUserAdminId)
+          ).toList();
+        }
+      }
+
       setState(() {
-        _binProperties = list.map((p) => PropertyModel.fromJson(p)).toList();
+        _binProperties = parsedList;
         _isLoading = false;
       });
     } catch (e) {
@@ -563,6 +588,11 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                           ? _buildEmptyState('Properties deleted from active listings will appear here.')
                           : Builder(
                               builder: (context) {
+                                final authState = context.read<AuthBloc>().state;
+                                final currentUser = authState is Authenticated ? authState.user : null;
+                                final isUserAdminOrSuperAdmin = currentUser != null &&
+                                    (currentUser.role == 'Admin' || currentUser.role == 'Super Admin');
+
                                 final totalItems = _binProperties.length;
                                 final totalPages = (totalItems / _propertiesPerPage).ceil().clamp(1, double.infinity).toInt();
                                 final startIndex = (_currentPropertiesPage - 1) * _propertiesPerPage;
@@ -578,18 +608,22 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                       showCheckboxColumn: false,
                                       dataRowMinHeight: 56.0,
                                       dataRowMaxHeight: 64.0,
-                                      columns: const [
-                                        DataColumn(label: Text('Code')),
-                                        DataColumn(label: Text('Property Name')),
-                                        DataColumn(label: Text('Owner')),
-                                        DataColumn(label: Text('Area')),
-                                        DataColumn(label: Text('Price')),
-                                        DataColumn(label: Text('Actions')),
+                                      columns: [
+                                        const DataColumn(label: Text('Code')),
+                                        if (isUserAdminOrSuperAdmin)
+                                          const DataColumn(label: Text('Listed By')),
+                                        const DataColumn(label: Text('Property Name')),
+                                        const DataColumn(label: Text('Owner')),
+                                        const DataColumn(label: Text('Area')),
+                                        const DataColumn(label: Text('Price')),
+                                        const DataColumn(label: Text('Actions')),
                                       ],
                                       rows: paginatedProperties.map((p) {
                                         return DataRow(
                                           cells: [
                                             DataCell(Text(p.propertyCode, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                            if (isUserAdminOrSuperAdmin)
+                                              DataCell(Text(p.createdByName)),
                                             DataCell(Text(p.title)),
                                             DataCell(Text(p.ownerName)),
                                             DataCell(Text(p.areaName)),
