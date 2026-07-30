@@ -88,13 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final greeting = _getGreeting();
 
     return BlocConsumer<DashboardBloc, DashboardState>(
-      listener: (context, state) {
-        if (state is DashboardLoadedState) {
-          _optimisticChecklistStates.clear();
-          _optimisticAddedChecklistItems.clear();
-          _optimisticDeletedChecklistIds.clear();
-        }
-      },
+      listener: (context, state) {},
       builder: (context, state) {
         if (state is DashboardLoading || state is DashboardInitial) {
           return const Padding(
@@ -255,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildKPIGrids(DashboardSummary summary, {required bool isDesktop}) {
     final double screenWidth = MediaQuery.of(context).size.width;
 
-    final int availableVal = summary.available;
+    final int availableVal = _activeTab == 'Rental' ? summary.rentalAvailable : summary.resaleAvailable;
     final int soldVal = summary.resaleSold;
     final int rentedVal = summary.rentalRented;
     final int requirementsVal = _activeTab == 'Rental' ? summary.rentalRequirements : summary.resaleRequirements;
@@ -905,6 +899,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTodayWork(List<ChecklistItem> items) {
+    // Self-clean optimistic checklist states: remove when local item state matches the optimistic target
+    _optimisticChecklistStates.removeWhere((itemId, optVal) {
+      final match = items.where((x) => x.id == itemId);
+      if (match.isNotEmpty) {
+        return match.first.isCompleted == optVal;
+      }
+      return false;
+    });
+
+    // Self-clean optimistic deleted checklist IDs: remove when the item is no longer present in the source list
+    _optimisticDeletedChecklistIds.removeWhere((itemId) {
+      return items.where((x) => x.id == itemId).isEmpty;
+    });
+
+    // Self-clean optimistic added checklist items: remove when an item with the same title is in the source list
+    _optimisticAddedChecklistItems.removeWhere((addedItem) {
+      return items.any((x) => x.title.trim().toLowerCase() == addedItem.title.trim().toLowerCase());
+    });
+
     final allItems = [...items, ..._optimisticAddedChecklistItems];
     final activeItems = allItems.where((item) => !_optimisticDeletedChecklistIds.contains(item.id)).toList();
 

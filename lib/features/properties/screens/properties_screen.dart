@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -39,6 +40,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   String? _highlightedPropertyId;
   String _activeTab = 'All';
   String _activeListingTab = 'Rent'; // 'Rent' or 'Only Re-Sale'
+  String _activeCategoryTab = 'Residential';
   bool _hasAutoOpenedAdd = false;
   bool _hasAutoOpenedProp = false;
   String? _selectedCategory;
@@ -1018,12 +1020,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   }
 
   Widget _buildStatisticsRow(List<PropertyModel> properties) {
-    final bookmarkedIds =
-        (context.read<PropertiesBloc>().state is PropertiesLoaded)
-            ? (context.read<PropertiesBloc>().state as PropertiesLoaded)
-                .bookmarkedIds
-            : <String>{};
-
     final filteredByListingTab = properties.where((p) {
       final ltName = p.listingTypeName.toLowerCase();
       if (_activeListingTab == 'Rent') {
@@ -1035,76 +1031,394 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       }
     }).toList();
 
-    final active = filteredByListingTab
-        .where((p) => p.propertyStatusName == 'Available').length;
-
-    final double screenWidth = MediaQuery.of(context).size.width;
-
-    final cards = [
-      CRMKPICard(
-          title: 'Active listings',
-          value: '$active',
-          icon: Icons.bolt_rounded,
-          iconColor: CRMColors.primaryOf(context)),
-    ];
-
-    bool isBhkCategory(PropertyModel p) {
-      final catName = p.categoryName.toLowerCase();
-      return !catName.contains('commercial') &&
-          !catName.contains('industrial') &&
-          !catName.contains('land') &&
-          !catName.contains('plot');
-    }
-
-    final Map<int, Color> bhkColors = {
-      1: CRMColors.info,
-      2: CRMColors.success,
-      3: CRMColors.warning,
-      4: CRMColors.danger,
-      5: CRMColors.primaryOf(context),
-    };
-
-    for (int bhk = 1; bhk <= 5; bhk++) {
-      final count = filteredByListingTab
-          .where((p) =>
-              isBhkCategory(p) &&
-              ((p.configurationName != null &&
-                      p.configurationName!
-                          .toLowerCase()
-                          .startsWith('$bhk bhk')) ||
-                  (p.configurationName == null && p.bedrooms == bhk)))
-          .length;
-      if (count > 0) {
-        cards.add(
-          CRMKPICard(
-            title: '$bhk BHK',
-            value: '$count',
-            icon: Icons.king_bed_outlined,
-            iconColor: bhkColors[bhk] ?? CRMColors.primaryOf(context),
-          ),
-        );
+    bool matchesActiveCategory(PropertyModel p) {
+      final cat = p.categoryName.toLowerCase();
+      if (_activeCategoryTab == 'Residential') {
+        return cat.contains('resident') ||
+            cat.contains('apartment') ||
+            cat.contains('flat') ||
+            cat.contains('villa') ||
+            cat.contains('house') ||
+            cat.contains('bhk') ||
+            (!cat.contains('commercial') &&
+                !cat.contains('industrial') &&
+                !cat.contains('land') &&
+                !cat.contains('plot'));
+      } else if (_activeCategoryTab == 'Commercial') {
+        return cat.contains('commercial') ||
+            cat.contains('office') ||
+            cat.contains('shop') ||
+            cat.contains('showroom') ||
+            cat.contains('retail');
+      } else if (_activeCategoryTab == 'Industrial') {
+        return cat.contains('industrial') ||
+            cat.contains('factory') ||
+            cat.contains('warehouse') ||
+            cat.contains('shed');
+      } else if (_activeCategoryTab == 'Land & Plot') {
+        return cat.contains('land') || cat.contains('plot');
       }
+      return false;
     }
 
+    final filteredByListingAndCategory = filteredByListingTab.where(matchesActiveCategory).toList();
+    final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
     final double cardWidth = isMobile
         ? (screenWidth - (CRMSpacing.m * 2) - CRMSpacing.m).clamp(0.0, double.infinity) / 2
         : 180.0;
+    final double chartCardWidth = isMobile
+        ? (screenWidth - (CRMSpacing.m * 2))
+        : 260.0;
     final double cardHeight = isMobile ? 105.0 : 120.0;
+
+    final List<Widget> widgets = [];
+
+    if (_activeCategoryTab == 'Residential') {
+      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final toBeActive = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'To Be Available').length;
+      
+      final activeSectors = <ChartSector>[];
+      if (active > 0) {
+        activeSectors.add(ChartSector(label: 'Available', value: active.toDouble(), color: CRMColors.success));
+      }
+      if (toBeActive > 0) {
+        activeSectors.add(ChartSector(label: 'To Be Available', value: toBeActive.toDouble(), color: CRMColors.warning));
+      }
+
+      widgets.add(SizedBox(
+        width: cardWidth,
+        height: cardHeight,
+        child: CRMKPICard(
+          title: 'Active listings',
+          value: '$active',
+          icon: Icons.bolt_rounded,
+          iconColor: CRMColors.primaryOf(context),
+        ),
+      ));
+
+      final List<ChartSector> bhkSectors = [];
+      final colors = [
+        CRMColors.info,
+        CRMColors.success,
+        CRMColors.warning,
+        CRMColors.danger,
+        CRMColors.primaryOf(context),
+      ];
+      for (int bhk = 1; bhk <= 5; bhk++) {
+        final count = filteredByListingAndCategory
+            .where((p) =>
+                ((p.configurationName != null &&
+                        p.configurationName!.toLowerCase().startsWith('$bhk bhk')) ||
+                    (p.configurationName == null && p.bedrooms == bhk)))
+            .length;
+        if (count > 0) {
+          bhkSectors.add(ChartSector(
+            label: '$bhk BHK',
+            value: count.toDouble(),
+            color: colors[(bhk - 1) % colors.length],
+          ));
+        }
+      }
+
+      if (bhkSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'BHK Distribution',
+            sectors: bhkSectors,
+          ),
+        ));
+      }
+
+      if (activeSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Availability Status',
+            sectors: activeSectors,
+          ),
+        ));
+      }
+    } else if (_activeCategoryTab == 'Commercial') {
+      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final offices = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('office') || p.title.toLowerCase().contains('office') || (p.description != null && p.description!.toLowerCase().contains('office'))).toList();
+      final shops = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('shop') || p.categoryName.toLowerCase().contains('retail') || p.categoryName.toLowerCase().contains('showroom') || p.title.toLowerCase().contains('shop') || p.title.toLowerCase().contains('showroom') || (p.description != null && p.description!.toLowerCase().contains('shop'))).toList();
+      
+      final otherCount = active - (offices.where((p) => p.propertyStatusName == 'Available').length + shops.where((p) => p.propertyStatusName == 'Available').length);
+
+      final comSectors = <ChartSector>[];
+      if (offices.isNotEmpty) {
+        comSectors.add(ChartSector(label: 'Office Spaces', value: offices.length.toDouble(), color: CRMColors.info));
+      }
+      if (shops.isNotEmpty) {
+        comSectors.add(ChartSector(label: 'Shops & Retail', value: shops.length.toDouble(), color: CRMColors.success));
+      }
+      if (otherCount > 0) {
+        comSectors.add(ChartSector(label: 'Other Commercial', value: otherCount.toDouble(), color: CRMColors.warning));
+      }
+
+      widgets.add(SizedBox(
+        width: cardWidth,
+        height: cardHeight,
+        child: CRMKPICard(
+          title: 'Commercial Listings',
+          value: '$active',
+          icon: Icons.business_center_outlined,
+          iconColor: CRMColors.primaryOf(context),
+        ),
+      ));
+
+      if (comSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Commercial Subcategories',
+            sectors: comSectors,
+          ),
+        ));
+      }
+
+      final Map<String, int> typeCounts = {};
+      for (final p in filteredByListingAndCategory) {
+        final typeName = p.propertyTypeName;
+        if (typeName.isNotEmpty && typeName != 'N/A') {
+          typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
+        }
+      }
+      final List<ChartSector> typeSectors = [];
+      final typeColors = [
+        CRMColors.primaryOf(context),
+        CRMColors.info,
+        CRMColors.success,
+        CRMColors.warning,
+        CRMColors.danger,
+      ];
+      int index = 0;
+      typeCounts.forEach((name, count) {
+        if (count > 0) {
+          typeSectors.add(ChartSector(
+            label: name,
+            value: count.toDouble(),
+            color: typeColors[index % typeColors.length],
+          ));
+          index++;
+        }
+      });
+
+      if (typeSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Property Types',
+            sectors: typeSectors,
+          ),
+        ));
+      }
+    } else if (_activeCategoryTab == 'Industrial') {
+      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final warehouses = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('warehouse') || p.title.toLowerCase().contains('warehouse') || (p.description != null && p.description!.toLowerCase().contains('warehouse'))).toList();
+      final factories = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('factory') || p.categoryName.toLowerCase().contains('industrial') || p.title.toLowerCase().contains('factory') || (p.description != null && p.description!.toLowerCase().contains('factory'))).toList();
+      
+      final otherCount = active - (warehouses.where((p) => p.propertyStatusName == 'Available').length + factories.where((p) => p.propertyStatusName == 'Available').length);
+
+      final indSectors = <ChartSector>[];
+      if (warehouses.isNotEmpty) {
+        indSectors.add(ChartSector(label: 'Warehouses', value: warehouses.length.toDouble(), color: CRMColors.warning));
+      }
+      if (factories.isNotEmpty) {
+        indSectors.add(ChartSector(label: 'Factories', value: factories.length.toDouble(), color: CRMColors.danger));
+      }
+      if (otherCount > 0) {
+        indSectors.add(ChartSector(label: 'Sheds & Yards', value: otherCount.toDouble(), color: CRMColors.info));
+      }
+
+      widgets.add(SizedBox(
+        width: cardWidth,
+        height: cardHeight,
+        child: CRMKPICard(
+          title: 'Industrial Listings',
+          value: '$active',
+          icon: Icons.factory_outlined,
+          iconColor: CRMColors.primaryOf(context),
+        ),
+      ));
+
+      if (indSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Industrial Subcategories',
+            sectors: indSectors,
+          ),
+        ));
+      }
+
+      final Map<String, int> typeCounts = {};
+      for (final p in filteredByListingAndCategory) {
+        final typeName = p.propertyTypeName;
+        if (typeName.isNotEmpty && typeName != 'N/A') {
+          typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
+        }
+      }
+      final List<ChartSector> typeSectors = [];
+      final typeColors = [
+        CRMColors.primaryOf(context),
+        CRMColors.info,
+        CRMColors.success,
+        CRMColors.warning,
+        CRMColors.danger,
+      ];
+      int index = 0;
+      typeCounts.forEach((name, count) {
+        if (count > 0) {
+          typeSectors.add(ChartSector(
+            label: name,
+            value: count.toDouble(),
+            color: typeColors[index % typeColors.length],
+          ));
+          index++;
+        }
+      });
+
+      if (typeSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Property Types',
+            sectors: typeSectors,
+          ),
+        ));
+      }
+    } else if (_activeCategoryTab == 'Land & Plot') {
+      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final resPlots = filteredByListingAndCategory.where((p) => p.title.toLowerCase().contains('resident') || (p.description != null && p.description!.toLowerCase().contains('resident'))).toList();
+      final comLand = filteredByListingAndCategory.where((p) => p.title.toLowerCase().contains('commercial') || (p.description != null && p.description!.toLowerCase().contains('commercial'))).toList();
+      final otherLand = active - (resPlots.where((p) => p.propertyStatusName == 'Available').length + comLand.where((p) => p.propertyStatusName == 'Available').length);
+
+      final landSectors = <ChartSector>[];
+      if (resPlots.isNotEmpty) {
+        landSectors.add(ChartSector(label: 'Residential Plots', value: resPlots.length.toDouble(), color: CRMColors.success));
+      }
+      if (comLand.isNotEmpty) {
+        landSectors.add(ChartSector(label: 'Commercial Land', value: comLand.length.toDouble(), color: CRMColors.info));
+      }
+      if (otherLand > 0) {
+        landSectors.add(ChartSector(label: 'Other Land', value: otherLand.toDouble(), color: CRMColors.warning));
+      }
+
+      widgets.add(SizedBox(
+        width: cardWidth,
+        height: cardHeight,
+        child: CRMKPICard(
+          title: 'Land & Plots',
+          value: '$active',
+          icon: Icons.landscape_outlined,
+          iconColor: CRMColors.primaryOf(context),
+        ),
+      ));
+
+      if (landSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Zoning & Land Usage',
+            sectors: landSectors,
+          ),
+        ));
+      }
+
+      final Map<String, int> typeCounts = {};
+      for (final p in filteredByListingAndCategory) {
+        final typeName = p.propertyTypeName;
+        if (typeName.isNotEmpty && typeName != 'N/A') {
+          typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
+        }
+      }
+      final List<ChartSector> typeSectors = [];
+      final typeColors = [
+        CRMColors.primaryOf(context),
+        CRMColors.info,
+        CRMColors.success,
+        CRMColors.warning,
+        CRMColors.danger,
+      ];
+      int index = 0;
+      typeCounts.forEach((name, count) {
+        if (count > 0) {
+          typeSectors.add(ChartSector(
+            label: name,
+            value: count.toDouble(),
+            color: typeColors[index % typeColors.length],
+          ));
+          index++;
+        }
+      });
+
+      if (typeSectors.isNotEmpty) {
+        widgets.add(SizedBox(
+          width: chartCardWidth,
+          height: cardHeight,
+          child: CRMChartCard(
+            title: 'Property Types',
+            sectors: typeSectors,
+          ),
+        ));
+      }
+    }
+
+    final categories = ['Residential', 'Commercial', 'Industrial', 'Land & Plot'];
+    final categorySelector = Container(
+      margin: const EdgeInsets.only(bottom: CRMSpacing.m),
+      child: Wrap(
+        spacing: CRMSpacing.s,
+        runSpacing: CRMSpacing.s,
+        children: categories.map((cat) {
+          final isSelected = _activeCategoryTab == cat;
+          return ChoiceChip(
+            label: Text(
+              cat,
+              style: TextStyle(
+                color: isSelected ? Colors.white : CRMColors.textSecondaryOf(context),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            selected: isSelected,
+            selectedColor: const Color(0xFF64826F),
+            backgroundColor: CRMColors.backgroundOf(context).withOpacity(0.5),
+            onSelected: (selected) {
+              if (selected) {
+                setState(() {
+                  _activeCategoryTab = cat;
+                });
+              }
+            },
+          );
+        }).toList(),
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: CRMSpacing.xs),
-      child: Wrap(
-        spacing: CRMSpacing.m,
-        runSpacing: CRMSpacing.m,
-        children: cards
-            .map((card) => SizedBox(
-                  width: cardWidth,
-                  height: cardHeight,
-                  child: card,
-                ))
-            .toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          categorySelector,
+          Wrap(
+            spacing: CRMSpacing.m,
+            runSpacing: CRMSpacing.m,
+            children: widgets,
+          ),
+        ],
       ),
     );
   }
@@ -1740,6 +2054,374 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       ),
       errorWidget: (context, url, error) =>
           const Icon(Icons.broken_image_outlined, size: 16),
+    );
+  }
+}
+
+class CRMChartCard extends StatelessWidget {
+  final String title;
+  final List<ChartSector> sectors;
+
+  const CRMChartCard({
+    Key? key,
+    required this.title,
+    required this.sectors,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bgColor = theme.brightness == Brightness.dark
+        ? const Color(0xFF1E293B)
+        : Colors.white;
+    final titleColor = theme.brightness == Brightness.dark
+        ? const Color(0xFFF8FAFC)
+        : const Color(0xFF1E293B);
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
+
+    return CRMCard(
+      elevated: true,
+      padding: EdgeInsets.all(isMobile ? CRMSpacing.s : CRMSpacing.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: titleColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Row(
+              children: [
+                SizedBox(
+                  width: isMobile ? 65 : 80,
+                  height: isMobile ? 65 : 80,
+                  child: CustomPaint(
+                    painter: DonutChartPainter(
+                      sectors: sectors,
+                      backgroundColor: bgColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: sectors.map((s) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: s.color,
+                                borderRadius: BorderRadius.circular(1.5),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${s.label}: ${s.value.toInt()}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: titleColor.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class KPICardData {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color iconColor;
+  final String chartTitle;
+  final List<ChartSector> sectors;
+
+  KPICardData({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.chartTitle,
+    required this.sectors,
+  });
+}
+
+class ChartSector {
+  final String label;
+  final double value;
+  final Color color;
+
+  ChartSector({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+}
+
+class DonutChartPainter extends CustomPainter {
+  final List<ChartSector> sectors;
+  final Color backgroundColor;
+
+  DonutChartPainter({required this.sectors, required this.backgroundColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double total = sectors.fold(0, (sum, s) => sum + s.value);
+    if (total == 0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width < size.height ? size.width / 2 : size.height / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    double startAngle = -3.1415926535 / 2; // Start from top
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    for (final sector in sectors) {
+      final sweepAngle = (sector.value / total) * 2 * 3.1415926535;
+      paint.color = sector.color;
+      canvas.drawArc(rect, startAngle, sweepAngle, true, paint);
+
+      // Draw percentage text inside the sector if it's large enough
+      if (sweepAngle > 0.15) {
+        final middleAngle = startAngle + sweepAngle / 2;
+        final textRadius = radius * 0.7; // Inner position for label
+        final textX = center.dx + textRadius * math.cos(middleAngle);
+        final textY = center.dy + textRadius * math.sin(middleAngle);
+
+        final percentage = (sector.value / total * 100).toStringAsFixed(0);
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: '$percentage%',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: ui.TextDirection.ltr,
+        );
+        textPainter.layout();
+        textPainter.paint(
+          canvas,
+          Offset(textX - textPainter.width / 2, textY - textPainter.height / 2),
+        );
+      }
+
+      startAngle += sweepAngle;
+    }
+
+    // Draw center hole to make it a donut chart
+    final centerPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius * 0.45, centerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class HoverChartTooltip extends StatefulWidget {
+  final Widget child;
+  final String title;
+  final List<ChartSector> sectors;
+
+  const HoverChartTooltip({
+    Key? key,
+    required this.child,
+    required this.title,
+    required this.sectors,
+  }) : super(key: key);
+
+  @override
+  State<HoverChartTooltip> createState() => _HoverChartTooltipState();
+}
+
+class _HoverChartTooltipState extends State<HoverChartTooltip> {
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
+  bool _isHovered = false;
+
+  void _showOverlay() {
+    if (widget.sectors.isEmpty) return;
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final bgColor = theme.brightness == Brightness.dark
+            ? const Color(0xFF1E293B)
+            : Colors.white;
+        final borderColor = theme.brightness == Brightness.dark
+            ? const Color(0xFF334155)
+            : const Color(0xFFE2E8F0);
+        final titleColor = theme.brightness == Brightness.dark
+            ? const Color(0xFFF8FAFC)
+            : const Color(0xFF1E293B);
+
+        return Positioned(
+          width: 320,
+          height: 180,
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            offset: const Offset(0, -190), // Show above the card
+            child: MouseRegion(
+              onEnter: (_) {
+                _isHovered = true;
+              },
+              onExit: (_) {
+                _isHovered = false;
+                _hideOverlay();
+              },
+              child: Material(
+                elevation: 12,
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                shadowColor: Colors.black.withOpacity(0.15),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: titleColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 110,
+                              height: 110,
+                              child: CustomPaint(
+                                painter: DonutChartPainter(
+                                  sectors: widget.sectors,
+                                  backgroundColor: bgColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: widget.sectors.map((s) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            color: s.color,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '${s.label}: ${s.value.toInt()}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: titleColor.withOpacity(0.8),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )).toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _hideOverlay() {
+    // Wait briefly to make sure user didn't enter the overlay region
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!_isHovered) {
+        _overlayEntry?.remove();
+        _overlayEntry = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _isHovered = true;
+          _showOverlay();
+        },
+        onExit: (_) {
+          _isHovered = false;
+          _hideOverlay();
+        },
+        child: widget.child,
+      ),
     );
   }
 }
