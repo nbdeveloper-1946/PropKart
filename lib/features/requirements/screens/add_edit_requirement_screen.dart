@@ -12,6 +12,7 @@ import '../../requirements/repository/requirements_repository.dart';
 import '../../../core/storage/repository_coordinator.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/models/user_model.dart';
+import '../../../core/design_system/widgets/form/crm_multi_select_dropdown.dart';
 
 class AddEditRequirementScreen extends StatefulWidget {
   final RequirementModel? requirement;
@@ -918,14 +919,14 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
             onChanged: (val) => setState(() => _selectedTypeId = val),
           ),
           const SizedBox(height: CRMSpacing.m),
-          _buildMultiSelectDropdown(
+          CRMMultiSelectDropdown(
             label: 'Furnishing',
             selectedIds: _selectedFurnishingIds,
             items: _furnishings,
             onChanged: (vals) => setState(() {}),
           ),
           const SizedBox(height: CRMSpacing.m),
-          _buildMultiSelectDropdown(
+          CRMMultiSelectDropdown(
             label: 'Facing',
             selectedIds: _selectedFacingIds,
             items: _facings,
@@ -1236,95 +1237,5 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
     );
   }
 
-  Widget _buildMultiSelectDropdown({
-    required String label,
-    required List<String> selectedIds,
-    required List<LookupItem> items,
-    required ValueChanged<List<String>> onChanged,
-  }) {
-    final displayTexts = selectedIds.map((id) {
-      final match = items.firstWhere((item) => item.id == id, orElse: () => LookupItem(id: id, name: id));
-      return match.name;
-    }).toList();
-    final displayText = displayTexts.isNotEmpty ? displayTexts.join(', ') : 'Select $label';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context))),
-        const SizedBox(height: CRMSpacing.xs),
-        InkWell(
-          onTap: () {
-            showDialog(
-              context: context,
-              builder: (dialogContext) {
-                return StatefulBuilder(
-                  builder: (ctx, setDialogState) {
-                    return AlertDialog(
-                      backgroundColor: CRMColors.cardBg,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.m)),
-                      title: Text("Select $label", style: CRMTypography.sectionTitle.copyWith(color: CRMColors.text)),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: items.map((item) {
-                            final isChecked = selectedIds.contains(item.id);
-                            return CheckboxListTile(
-                              activeColor: CRMColors.primary,
-                              title: Text(item.name, style: TextStyle(color: CRMColors.text)),
-                              value: isChecked,
-                              onChanged: (bool? checked) {
-                                setDialogState(() {
-                                  if (checked == true) {
-                                    selectedIds.add(item.id);
-                                  } else {
-                                    selectedIds.remove(item.id);
-                                  }
-                                });
-                                onChanged(List<String>.from(selectedIds));
-                                setState(() {}); // update outer widget
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      actions: [
-                        CRMButton(
-                          label: "Done",
-                          variant: CRMButtonVariant.primary,
-                          onPressed: () => Navigator.pop(dialogContext),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: CRMSpacing.s),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-              border: Border.all(color: CRMColors.borderOf(context)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    displayText,
-                    style: CRMTypography.body.copyWith(
-                      color: selectedIds.isNotEmpty ? CRMColors.textOf(context) : CRMColors.textSecondaryOf(context),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }

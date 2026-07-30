@@ -15,6 +15,9 @@ import '../../api/dio_client.dart';
 import '../../utils/budget_formatter.dart';
 import '../../network/sync_manager.dart';
 import 'dart:async';
+import 'package:collection/collection.dart';
+import '../../../core/storage/repository_coordinator.dart';
+import '../../../core/storage/isar_collections.dart';
 
 class CRMAppShell extends StatefulWidget {
   final Widget child;
@@ -66,6 +69,8 @@ class _CRMAppShellState extends State<CRMAppShell> {
   List<dynamic> _propertySuggestions = [];
   List<dynamic> _requirementSuggestions = [];
   List<dynamic> _ownerSuggestions = [];
+  List<dynamic> _builderSuggestions = [];
+  List<dynamic> _clientSuggestions = [];
   bool _isSearching = false;
   Timer? _searchDebounce;
   List<dynamic> _notifications = [];
@@ -277,12 +282,81 @@ class _CRMAppShellState extends State<CRMAppShell> {
     setState(() => _isSearching = true);
     _showSearchOverlay();
     try {
-      final response = await DioClient.dio.get('/search', queryParameters: {'query': query});
-      final data = response.data['data'] ?? {};
+      final queryLower = query.toLowerCase();
+
+      // 1. Properties
+      final props = await RepositoryCoordinator().propertyLocal.getProperties();
+      final matchedProps = props.where((p) =>
+        p.title.toLowerCase().contains(queryLower) ||
+        p.propertyCode.toLowerCase().contains(queryLower) ||
+        p.ownerName.toLowerCase().contains(queryLower) ||
+        p.ownerMobile.contains(queryLower) ||
+        (p.description?.toLowerCase().contains(queryLower) ?? false)
+      ).map((p) => {
+        'id': p.id,
+        'title': p.title,
+        'property_code': p.propertyCode,
+        'price': p.price,
+      }).toList();
+
+      // 2. Requirements
+      final reqs = await RepositoryCoordinator().requirementLocal.getRequirements();
+      final matchedReqs = reqs.where((r) =>
+        r.clientName.toLowerCase().contains(queryLower) ||
+        r.clientMobile.contains(queryLower) ||
+        (r.remarks?.toLowerCase().contains(queryLower) ?? false)
+      ).map((r) => {
+        'id': r.id,
+        'customer_name': r.clientName,
+        'mobile': r.clientMobile,
+      }).toList();
+
+      // 3. Owners
+      final owners = await RepositoryCoordinator().ownerLocal.getOwners();
+      final matchedOwners = owners.where((o) =>
+        o.name.toLowerCase().contains(queryLower) ||
+        o.mobile.contains(queryLower) ||
+        (o.email?.toLowerCase().contains(queryLower) ?? false)
+      ).map((o) => {
+        'id': o.id,
+        'name': o.name,
+        'mobile': o.mobile,
+      }).toList();
+
+      // 4. Builders
+      final builders = await RepositoryCoordinator().builderLocal.getBuilders();
+      final matchedBuilders = builders.where((b) =>
+        b.companyName.toLowerCase().contains(queryLower) ||
+        b.contactPerson.toLowerCase().contains(queryLower) ||
+        b.mobile.contains(queryLower) ||
+        b.email.toLowerCase().contains(queryLower) ||
+        (b.remarks?.toLowerCase().contains(queryLower) ?? false)
+      ).map((b) => {
+        'id': b.id,
+        'company_name': b.companyName,
+        'contact_person': b.contactPerson,
+        'mobile': b.mobile,
+      }).toList();
+
+      // 5. Clients
+      final clients = await RepositoryCoordinator().clientLocal.getClients();
+      final matchedClients = clients.where((c) =>
+        c.name.toLowerCase().contains(queryLower) ||
+        c.mobile.contains(queryLower) ||
+        c.email.toLowerCase().contains(queryLower) ||
+        (c.remarks?.toLowerCase().contains(queryLower) ?? false)
+      ).map((c) => {
+        'id': c.id,
+        'name': c.name,
+        'mobile': c.mobile,
+      }).toList();
+
       setState(() {
-        _propertySuggestions = data['properties'] ?? [];
-        _requirementSuggestions = data['requirements'] ?? [];
-        _ownerSuggestions = data['owners'] ?? [];
+        _propertySuggestions = matchedProps;
+        _requirementSuggestions = matchedReqs;
+        _ownerSuggestions = matchedOwners;
+        _builderSuggestions = matchedBuilders;
+        _clientSuggestions = matchedClients;
         _isSearching = false;
       });
       _searchOverlayEntry?.markNeedsBuild();
@@ -326,7 +400,9 @@ class _CRMAppShellState extends State<CRMAppShell> {
                       )
                     : (_propertySuggestions.isEmpty &&
                             _requirementSuggestions.isEmpty &&
-                            _ownerSuggestions.isEmpty)
+                            _ownerSuggestions.isEmpty &&
+                            _builderSuggestions.isEmpty &&
+                            _clientSuggestions.isEmpty)
                         ? Padding(
                             padding: const EdgeInsets.all(CRMSpacing.m),
                             child: Text(
@@ -372,6 +448,30 @@ class _CRMAppShellState extends State<CRMAppShell> {
                                       onTap: () {
                                         _hideSearchOverlay();
                                         context.go('/owners');
+                                      },
+                                    )),
+                              ],
+                              if (_builderSuggestions.isNotEmpty) ...[
+                                _buildSuggestionSectionHeader('Builders'),
+                                ..._builderSuggestions.map((b) => _buildSuggestionTile(
+                                      icon: Icons.construction_rounded,
+                                      title: b['company_name'] ?? '',
+                                      subtitle: 'Contact: ${b['contact_person']} • Mobile: ${b['mobile']}',
+                                      onTap: () {
+                                        _hideSearchOverlay();
+                                        context.go('/employees');
+                                      },
+                                    )),
+                              ],
+                              if (_clientSuggestions.isNotEmpty) ...[
+                                _buildSuggestionSectionHeader('Clients'),
+                                ..._clientSuggestions.map((c) => _buildSuggestionTile(
+                                      icon: Icons.people_alt_rounded,
+                                      title: c['name'] ?? '',
+                                      subtitle: 'Mobile: ${c['mobile']}',
+                                      onTap: () {
+                                        _hideSearchOverlay();
+                                        context.go('/requirements');
                                       },
                                     )),
                               ],
@@ -887,7 +987,6 @@ class _CRMAppShellState extends State<CRMAppShell> {
     String? userProfilePhoto;
     
     if (userState is Authenticated) {
-      userEmail = userState.user.email;
       userRole = userState.user.role;
       userFullName = userState.user.fullName;
       userProfilePhoto = userState.user.profilePhoto;
@@ -896,7 +995,6 @@ class _CRMAppShellState extends State<CRMAppShell> {
     }
 
     final isExpanded = isMobile || (sidebarWidth == null ? _isSidebarExpanded : sidebarWidth > 200.0);
-    final displayEmail = isExpanded ? userEmail : '';
     final displayRole = isExpanded ? userRole : '';
     final displayFullName = isExpanded ? userFullName : '';
 
@@ -962,15 +1060,17 @@ class _CRMAppShellState extends State<CRMAppShell> {
               vertical: CRMSpacing.m,
               horizontal: isExpanded ? CRMSpacing.m : CRMSpacing.xs,
             ),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (details) {
-                _showProfilePopup(context, details.globalPosition);
-              },
-              child: Row(
-                mainAxisAlignment: isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
+            child: Row(
+              mainAxisAlignment: isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    final currentRoute = GoRouterState.of(context).uri.toString();
+                    if (currentRoute != '/profile') {
+                      context.go('/profile');
+                    }
+                  },
+                  child: CircleAvatar(
                     backgroundColor: CRMColors.primary.withValues(alpha: 0.1),
                     backgroundImage: (userProfilePhoto != null && userProfilePhoto!.isNotEmpty)
                         ? NetworkImage(userProfilePhoto!)
@@ -979,9 +1079,17 @@ class _CRMAppShellState extends State<CRMAppShell> {
                         ? null
                         : Icon(Icons.person_outline_rounded, color: CRMColors.primary),
                   ),
-                  if (isExpanded) ...[
-                    const SizedBox(width: CRMSpacing.m),
-                    Expanded(
+                ),
+                if (isExpanded) ...[
+                  const SizedBox(width: CRMSpacing.m),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        final currentRoute = GoRouterState.of(context).uri.toString();
+                        if (currentRoute != '/profile') {
+                          context.go('/profile');
+                        }
+                      },
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -992,7 +1100,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
                             maxLines: 1,
                           ),
                           Text(
-                            '$displayRole • $displayEmail',
+                            displayRole,
                             style: CRMTypography.caption.copyWith(color: CRMColors.textSecondaryOf(context), fontSize: 10),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -1000,10 +1108,16 @@ class _CRMAppShellState extends State<CRMAppShell> {
                         ],
                       ),
                     ),
-                    Icon(Icons.more_vert_rounded, color: CRMColors.textSecondaryOf(context), size: 18),
-                  ],
+                  ),
+                  GestureDetector(
+                    onTap: _handleLogout,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Icon(Icons.logout_rounded, color: CRMColors.danger, size: 18),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -1011,118 +1125,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
     );
   }
 
-  void _showProfilePopup(BuildContext context, Offset tapPosition) {
-    final userState = context.read<AuthBloc>().state;
-    String userEmail = '';
-    String userRole = '';
-    String userFullName = '';
-    String? userProfilePhoto;
-    
-    if (userState is Authenticated) {
-      userEmail = userState.user.email;
-      userRole = userState.user.role;
-      userFullName = userState.user.fullName;
-      userProfilePhoto = userState.user.profilePhoto;
-    } else {
-      return;
-    }
 
-    final double screenWidth = MediaQuery.of(context).size.width;
-
-    showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        tapPosition.dx,
-        tapPosition.dy - 120,
-        screenWidth - tapPosition.dx,
-        0,
-      ),
-      color: CRMColors.cardBgOf(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(CRMBorderRadius.m),
-        side: BorderSide(color: CRMColors.borderOf(context), width: 0.5),
-      ),
-      items: <PopupMenuEntry<String>>[
-        PopupMenuItem(
-          enabled: false,
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: CRMColors.primary.withValues(alpha: 0.1),
-                backgroundImage: (userProfilePhoto != null && userProfilePhoto.isNotEmpty)
-                    ? NetworkImage(userProfilePhoto)
-                    : null,
-                child: (userProfilePhoto != null && userProfilePhoto.isNotEmpty)
-                    ? null
-                    : Icon(Icons.person_outline_rounded, color: CRMColors.primary),
-              ),
-              const SizedBox(width: CRMSpacing.m),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      userFullName,
-                      style: CRMTypography.captionBold.copyWith(
-                        color: CRMColors.textOf(context),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '$userRole • $userEmail',
-                      style: CRMTypography.caption.copyWith(
-                        color: CRMColors.textSecondaryOf(context),
-                        fontSize: 10,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'profile',
-          child: Row(
-            children: [
-              Icon(Icons.person_outline_rounded, color: CRMColors.textOf(context), size: 18),
-              const SizedBox(width: CRMSpacing.s),
-              Text(
-                'My Profile',
-                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
-              ),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'logout',
-          child: Row(
-            children: [
-              Icon(Icons.logout_rounded, color: CRMColors.danger, size: 18),
-              const SizedBox(width: CRMSpacing.s),
-              Text(
-                'Log Out',
-                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.danger, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'profile') {
-        final currentRoute = GoRouterState.of(context).uri.toString();
-        if (currentRoute != '/profile') {
-          context.go('/profile');
-        }
-      } else if (value == 'logout') {
-        _handleLogout();
-      }
-    });
-  }
 
   Widget _buildSidebarItem(
     IconData icon,

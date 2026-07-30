@@ -337,6 +337,13 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    bool isAdmin = false;
+    if (authState is Authenticated) {
+      final role = authState.user.role.toLowerCase();
+      isAdmin = role == 'admin' || role == 'super admin';
+    }
+
     final bool hasData = _selectedTab == 'Properties' 
         ? _binProperties.isNotEmpty 
         : (_requirementsSubTab == 'Bin' && _binRequirements.isNotEmpty);
@@ -389,7 +396,7 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
             ),
           ),
         ),
-        if (hasData)
+        if (hasData && isAdmin)
           CRMButton(
             label: 'Empty Bin',
             variant: CRMButtonVariant.danger,
@@ -637,12 +644,14 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                                     tooltip: 'Restore Property',
                                                     onPressed: () => _restoreProperty(p.id),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                  IconButton(
-                                                    icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
-                                                    tooltip: 'Permanently Delete',
-                                                    onPressed: () => _permanentDeleteProperty(p.id),
-                                                  ),
+                                                  if (isUserAdminOrSuperAdmin) ...[
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
+                                                      tooltip: 'Permanently Delete',
+                                                      onPressed: () => _permanentDeleteProperty(p.id),
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
                                             ),
@@ -761,19 +770,22 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                                     tooltip: _requirementsSubTab == 'Bin' ? 'Restore Requirement' : 'Make Active / Restore',
                                                     onPressed: () => _restoreRequirement(r),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                  if (_requirementsSubTab == 'Bin')
+                                                  if (_requirementsSubTab == 'Bin' && isUserAdminOrSuperAdmin) ...[
+                                                    const SizedBox(width: 8),
                                                     IconButton(
                                                       icon: Icon(Icons.delete_forever_rounded, color: CRMColors.danger, size: 20),
                                                       tooltip: 'Permanently Delete',
                                                       onPressed: () => _permanentDeleteRequirement(r.id),
-                                                    )
-                                                  else
+                                                    ),
+                                                  ]
+                                                  else if (_requirementsSubTab != 'Bin') ...[
+                                                    const SizedBox(width: 8),
                                                     IconButton(
                                                       icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 20),
                                                       tooltip: 'Move to Recycle Bin',
                                                       onPressed: () => _deleteRequirement(r),
                                                     ),
+                                                  ],
                                                 ],
                                               ),
                                             ),

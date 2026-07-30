@@ -32,6 +32,8 @@ dependencies:
   package_info_plus: ^8.0.0
   pub_semver: ^2.1.4
   flutter_riverpod: ^2.6.1
+  country_picker: ^2.0.28
+  intl_phone_field: 3.2.0
 
 dev_dependencies:
   flutter_test:

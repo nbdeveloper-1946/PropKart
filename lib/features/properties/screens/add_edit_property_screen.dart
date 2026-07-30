@@ -659,7 +659,9 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
 
   List<LookupItem> _getFilteredTypes() {
     if (_selectedCategory == null) return [];
-    return widget.metadata.types.where((t) => t.categoryId == _selectedCategory).toList();
+    return widget.metadata.types
+        .where((t) => t.categoryId == _selectedCategory && t.name.toLowerCase() != 'apartment')
+        .toList();
   }
 
   List<LookupItem> _getFilteredConfigs() {
@@ -718,6 +720,31 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
   }
 
   void _onPriceChanged() {
+    if (_selectedListingType != null) {
+      final selectedType = widget.metadata.listingTypes.firstWhere(
+        (l) => l.id == _selectedListingType,
+        orElse: () => LookupItem(id: '', name: ''),
+      );
+      final isRent = selectedType.name.toLowerCase().contains('rent');
+      if (isRent) {
+        final price = CRMCurrencyFormatter.parse(_priceController.text);
+        if (price > 1000000.0) {
+          _priceController.removeListener(_onPriceChanged);
+          _priceController.text = CRMCurrencyFormatter.format(1000000.0);
+          _priceController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _priceController.text.length),
+          );
+          _priceController.addListener(_onPriceChanged);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Rent price cannot exceed 10 Lakh rupees (1,000,000)."),
+              backgroundColor: CRMColors.danger,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    }
     _calculateDeposit();
   }
 
@@ -865,6 +892,21 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
 
   void _submitForm() async {
     if (!CRMFormUtils.validateAndScroll(_formKey, context)) return;
+
+    final selectedType = widget.metadata.listingTypes.firstWhere(
+      (l) => l.id == _selectedListingType,
+      orElse: () => LookupItem(id: '', name: ''),
+    );
+    final isRent = selectedType.name.toLowerCase().contains('rent');
+    final price = CRMCurrencyFormatter.parse(_priceController.text);
+    if (isRent && price > 1000000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Warning: Rent price exceeds 10 Lakh rupees (1,000,000)."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
 
     final toBeAvailableStatus = widget.metadata.statuses.firstWhere(
       (s) => s.name.toLowerCase().contains('to be available'),
@@ -1378,6 +1420,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                           _selectedDepositMonth = null;
                           _depositController.text = CRMCurrencyFormatter.format(0.0);
                         }
+                        _onPriceChanged();
                       });
                     },
                   ),
@@ -1452,6 +1495,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                                 _selectedDepositMonth = null;
                                 _depositController.text = CRMCurrencyFormatter.format(0.0);
                               }
+                              _onPriceChanged();
                             });
                           },
                         ),

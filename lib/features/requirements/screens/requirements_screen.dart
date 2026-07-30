@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/design_system/widgets/drawers.dart';
+import '../../../core/design_system/widgets/form/crm_multi_select_dropdown.dart';
 import '../bloc/requirements_bloc.dart';
 import '../models/requirement_model.dart';
 import '../repository/requirements_repository.dart';
@@ -31,6 +32,10 @@ import '../../auth/models/user_model.dart';
 import '../../users/bloc/users_bloc.dart';
 import '../../users/models/user_model.dart' as users_model;
 import '../../../core/config/app_config.dart';
+import 'package:collection/collection.dart';
+import 'package:propkart/core/storage/repository_coordinator.dart';
+import 'package:propkart/core/storage/model_mappers.dart';
+import 'package:propkart/core/storage/isar_collections.dart';
 
 /// WhatsApp brand green — kept as a distinct constant for brand recognition.
 const Color kWhatsAppGreen = Color(0xFF25D366);
@@ -46,7 +51,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _wonSearchController = TextEditingController();
   String? _wonCategoryId;
-  String? _selectedConfigId;
+  String? _wonPropertyTypeId;
+  final List<String> _wonConfigurationIds = [];
+  final List<String> _selectedConfigIds = [];
   String? _selectedCategoryId;
   String _selectedStatus = "All";
   String _selectedReadiness = "All";
@@ -119,9 +126,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     String? propTypeId;
     if (_activeMainTab != 'My Won') {
       if (isPropertyTypeFilter) {
-        propTypeId = _selectedConfigId;
+        propTypeId = _selectedConfigIds.isNotEmpty ? _selectedConfigIds.first : null;
       } else {
-        configId = _selectedConfigId;
+        configId = _selectedConfigIds.isNotEmpty ? _selectedConfigIds.first : null;
       }
     }
 
@@ -143,7 +150,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   void _clearFilters() {
     setState(() {
       _searchController.clear();
-      _selectedConfigId = null;
+      _selectedConfigIds.clear();
       _selectedCategoryId = null;
       _selectedStatus = "All";
       _selectedReadiness = "All";
@@ -542,18 +549,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   Widget _buildSearchAndFiltersCard() {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
     String configDropdownLabel = 'Configuration';
-    String allOptionsLabel = 'All Configurations';
-    List<DropdownMenuItem<String?>> specDropdownItems = [];
-
     final selectedCat = _metadata?.categories.firstWhere(
       (c) => c.id == _selectedCategoryId,
       orElse: () => LookupItem(id: '', name: ''),
     );
     final catName = selectedCat?.name.toLowerCase() ?? '';
+    List<LookupItem> specLookupItems = [];
 
     if (catName.contains('commercial')) {
       configDropdownLabel = 'Property Type';
-      allOptionsLabel = 'All Property Types';
       
       var filtered = _metadata?.types.where((t) => t.categoryId == _selectedCategoryId).toList() ?? [];
       if (filtered.isEmpty && _metadata != null) {
@@ -565,13 +569,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       if (filtered.isEmpty && _metadata != null) {
         filtered = _metadata!.types;
       }
-      specDropdownItems = [
-        DropdownMenuItem(value: null, child: Text(allOptionsLabel)),
-        ...filtered.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-      ];
+      specLookupItems = filtered;
     } else if (catName.contains('land') || catName.contains('plot')) {
       configDropdownLabel = 'Property Type';
-      allOptionsLabel = 'All Property Types';
       
       var filtered = _metadata?.types.where((t) => t.categoryId == _selectedCategoryId).toList() ?? [];
       if (filtered.isEmpty && _metadata != null) {
@@ -583,13 +583,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       if (filtered.isEmpty && _metadata != null) {
         filtered = _metadata!.types;
       }
-      specDropdownItems = [
-        DropdownMenuItem(value: null, child: Text(allOptionsLabel)),
-        ...filtered.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-      ];
+      specLookupItems = filtered;
     } else if (catName.contains('industrial')) {
       configDropdownLabel = 'Property Type';
-      allOptionsLabel = 'All Property Types';
       
       var filtered = _metadata?.types.where((t) => t.categoryId == _selectedCategoryId).toList() ?? [];
       if (filtered.isEmpty && _metadata != null) {
@@ -601,22 +597,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       if (filtered.isEmpty && _metadata != null) {
         filtered = _metadata!.types;
       }
-      specDropdownItems = [
-        DropdownMenuItem(value: null, child: Text(allOptionsLabel)),
-        ...filtered.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-      ];
+      specLookupItems = filtered;
     } else {
       configDropdownLabel = 'Configuration';
-      allOptionsLabel = 'All Configurations';
       
       var filtered = _metadata?.configurations.where((c) => _selectedCategoryId == null || c.categoryId == _selectedCategoryId).toList() ?? [];
       if (filtered.isEmpty && _metadata != null) {
         filtered = _metadata!.configurations;
       }
-      specDropdownItems = [
-        DropdownMenuItem(value: null, child: Text(allOptionsLabel)),
-        ...filtered.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-      ];
+      specLookupItems = filtered;
     }
 
     return CRMCard(
@@ -669,19 +658,18 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedCategoryId = val;
-                          _selectedConfigId = null;
+                          _selectedConfigIds.clear();
                         });
                         _triggerFetch();
                       },
                     ),
                     const SizedBox(height: CRMSpacing.s),
-                    _buildDropdownFilter<String?>(
+                    CRMMultiSelectDropdown(
                       label: configDropdownLabel,
-                      value: _selectedConfigId,
-                      items: specDropdownItems,
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedConfigId = val);
+                      selectedIds: _selectedConfigIds,
+                      items: specLookupItems,
+                      onChanged: (vals) {
+                        setState(() {});
                         _triggerFetch();
                       },
                     ),
@@ -731,20 +719,22 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedCategoryId = val;
-                          _selectedConfigId = null;
+                          _selectedConfigIds.clear();
                         });
                         _triggerFetch();
                       },
                     ),
-                    _buildDropdownFilter<String?>(
-                      label: configDropdownLabel,
-                      value: _selectedConfigId,
-                      items: specDropdownItems,
-                      isMobile: isMobile,
-                      onChanged: (val) {
-                        setState(() => _selectedConfigId = val);
-                        _triggerFetch();
-                      },
+                    SizedBox(
+                      width: isMobile ? double.infinity : 200,
+                      child: CRMMultiSelectDropdown(
+                        label: configDropdownLabel,
+                        selectedIds: _selectedConfigIds,
+                        items: specLookupItems,
+                        onChanged: (vals) {
+                          setState(() {});
+                          _triggerFetch();
+                        },
+                      ),
                     ),
                     _buildDropdownFilter(
                       label: 'Status',
@@ -911,9 +901,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
 
             final matchesListingType = getListingTypeLabel(r) == _activeListingTab;
             final matchesCategory = _selectedCategoryId == null || r.categoryId == _selectedCategoryId;
-            final matchesSpec = _selectedConfigId == null ||
-                r.configurationId == _selectedConfigId ||
-                r.propertyTypeId == _selectedConfigId;
+            final matchesSpec = _selectedConfigIds.isEmpty ||
+                _selectedConfigIds.contains(r.configurationId) ||
+                _selectedConfigIds.contains(r.propertyTypeId);
             
             // Map legacy status strings to new pipeline statuses for backward compatibility
             String mappedStatus = r.status;
@@ -1812,8 +1802,11 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             ),
         ],
       ),
-      child: FutureBuilder<DashboardData>(
-        future: DashboardRepository().getDashboardData(),
+      child: FutureBuilder<List<dynamic>>(
+        future: Future.wait([
+          DashboardRepository().getDashboardData(),
+          RepositoryCoordinator().requirementLocal.getRequirements(),
+        ]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Padding(
@@ -1821,14 +1814,32 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
               child: Center(child: CircularProgressIndicator()),
             );
           }
-          final followups = snapshot.data?.followups ?? [];
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final dashboardData = snapshot.data?[0] as DashboardData?;
+          final localReqs = snapshot.data?[1] as List<RequirementLocal>? ?? [];
+
+          final followups = dashboardData?.followups ?? [];
           final filtered = followups.where((f) {
-            if (_reqFollowupDateFilter == null) return true;
-            final parsed = DateTime.tryParse(f.followupDate);
-            if (parsed == null) return false;
-            return parsed.year == _reqFollowupDateFilter!.year &&
-                parsed.month == _reqFollowupDateFilter!.month &&
-                parsed.day == _reqFollowupDateFilter!.day;
+            // Filter by date
+            if (_reqFollowupDateFilter != null) {
+              final parsed = DateTime.tryParse(f.followupDate);
+              if (parsed == null) return false;
+              final matchesDate = parsed.year == _reqFollowupDateFilter!.year &&
+                  parsed.month == _reqFollowupDateFilter!.month &&
+                  parsed.day == _reqFollowupDateFilter!.day;
+              if (!matchesDate) return false;
+            }
+
+            // Filter by Rent/Re-Sale listing type tab
+            final req = localReqs.firstWhereOrNull((r) => r.id == f.requirementId);
+            if (req == null) return false;
+
+            final isRentTab = _activeListingTab == 'Rent';
+            final reqIsRent = req.listingTypeName?.toLowerCase().contains('rent') ?? false;
+            return isRentTab == reqIsRent;
           }).toList();
 
           final totalCount = filtered.length;
@@ -1879,7 +1890,27 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 rows: pageItems.map((f) {
                   return DataRow(
                     cells: [
-                      DataCell(Text(f.clientName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(
+                        GestureDetector(
+                          onTap: () {
+                            final reqLocal = localReqs.firstWhereOrNull((r) => r.id == f.requirementId);
+                            if (reqLocal != null) {
+                              _showRequirementDetailDrawer(reqLocal.toModel());
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Associated requirement details not found.')),
+                              );
+                            }
+                          },
+                          child: Text(
+                            f.clientName,
+                            style: CRMTypography.bodyMedium.copyWith(
+                              color: CRMColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                       DataCell(Text(f.mobile)),
                       DataCell(Builder(
                         builder: (_) {
@@ -2145,9 +2176,35 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     );
   }
 
+
+
   Widget _buildMyWonFiltersAndTable() {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 700;
+
+    final selectedCat = _metadata?.categories.firstWhereOrNull((c) => c.id == _wonCategoryId);
+    final isResidential = selectedCat?.name.toLowerCase().contains('residential') ?? false;
+
+    // Filtered types and configs for My Won
+    final filteredTypes = _metadata != null
+        ? _metadata!.types.where((t) => t.categoryId == _wonCategoryId).toList()
+        : <LookupItem>[];
+
+    final filteredConfigs = _metadata != null
+        ? _metadata!.configurations.where((c) {
+            final configName = c.name.toLowerCase();
+            if (isResidential) {
+              return !configName.contains('office') &&
+                  !configName.contains('shop') &&
+                  !configName.contains('showroom') &&
+                  !configName.contains('plot') &&
+                  !configName.contains('warehouse') &&
+                  !configName.contains('shed') &&
+                  !configName.contains('industrial');
+            }
+            return false;
+          }).toList()
+        : <LookupItem>[];
 
     final filterCard = CRMCard(
       child: Padding(
@@ -2192,32 +2249,13 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             ),
             const SizedBox(height: CRMSpacing.m),
 
-            // Listing Type buttons and Category dropdown
+            // Category dropdown filter and dependent configuration/type filters
             Wrap(
               spacing: CRMSpacing.m,
               runSpacing: CRMSpacing.s,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // Rent / Re-Sale Toggle Tabs
-                Container(
-                  height: 44,
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: CRMColors.background,
-                    borderRadius: BorderRadius.circular(CRMBorderRadius.s),
-                    border: Border.all(color: CRMColors.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildListingTabButton('Rent'),
-                      const SizedBox(width: 4),
-                      _buildListingTabButton('Re-Sale'),
-                    ],
-                  ),
-                ),
-
-                // Category dropdown filter next to it
+                // Category dropdown filter
                 _buildDropdownFilter<String?>(
                   label: 'Category',
                   value: _wonCategoryId,
@@ -2229,9 +2267,49 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   onChanged: (val) {
                     setState(() {
                       _wonCategoryId = val;
+                      _wonPropertyTypeId = null;
+                      _wonConfigurationIds.clear();
+                      _currentPage = 1;
                     });
                   },
                 ),
+
+                // Category-dependent configuration or property type filters
+                if (_wonCategoryId != null) ...[
+                  if (isResidential)
+                    SizedBox(
+                      width: isMobile ? double.infinity : 200,
+                      child: CRMMultiSelectDropdown(
+                        label: 'Configuration',
+                        selectedIds: _wonConfigurationIds,
+                        items: filteredConfigs,
+                        onChanged: (vals) {
+                          setState(() {
+                            _currentPage = 1;
+                          });
+                        },
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: isMobile ? double.infinity : 200,
+                      child: _buildDropdownFilter<String?>(
+                        label: 'Property Type',
+                        value: _wonPropertyTypeId,
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text("All Types")),
+                          ...filteredTypes.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                        ],
+                        isMobile: isMobile,
+                        onChanged: (val) {
+                          setState(() {
+                            _wonPropertyTypeId = val;
+                            _currentPage = 1;
+                          });
+                        },
+                      ),
+                    ),
+                ],
               ],
             ),
           ],
@@ -2264,6 +2342,12 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             // Category filter
             final matchesCategory = _wonCategoryId == null || r.categoryId == _wonCategoryId;
 
+            // Property Type filter
+            final matchesPropertyType = _wonPropertyTypeId == null || r.propertyTypeId == _wonPropertyTypeId;
+
+            // Configuration filter
+            final matchesConfig = _wonConfigurationIds.isEmpty || _wonConfigurationIds.contains(r.configurationId);
+
             // Search query filter
             bool matchesSearch = true;
             final query = _wonSearchController.text.trim().toLowerCase();
@@ -2295,7 +2379,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             
             final matchesStatus = mappedStatus == 'Won';
 
-            return matchesListingType && matchesStatus && matchesCategory && matchesSearch;
+            return matchesListingType && matchesStatus && matchesCategory && matchesPropertyType && matchesConfig && matchesSearch;
           }).toList();
           
           requirements.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -2304,15 +2388,9 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
         final totalCount = requirements.length;
         final totalPages = (totalCount / _requirementsPerPage).ceil();
         final currentPage = _currentPage.clamp(1, totalPages > 0 ? totalPages : 1);
-
         final startIndex = (currentPage - 1) * _requirementsPerPage;
         final endIndex = (startIndex + _requirementsPerPage).clamp(0, totalCount);
-
-        final pageItems = (startIndex < totalCount)
-            ? requirements.sublist(startIndex, endIndex)
-            : <RequirementModel>[];
-
-
+        final pageItems = (startIndex < totalCount) ? requirements.sublist(startIndex, endIndex) : <RequirementModel>[];
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -2343,12 +2421,6 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                     const DataColumn(label: Text('Actions')),
                   ],
                   rows: pageItems.map((req) {
-                    final qualityColor = req.requirementQuality == 'High'
-                        ? CRMColors.success
-                        : req.requirementQuality == 'Medium'
-                            ? CRMColors.warning
-                            : CRMColors.danger;
-
                     return DataRow(
                       cells: [
                         DataCell(

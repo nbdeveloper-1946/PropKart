@@ -17,6 +17,7 @@ import '../../../core/design_system/widgets/cards.dart';
 import '../../../core/design_system/widgets/buttons.dart';
 import '../../../core/design_system/widgets/data_table.dart';
 import '../../../core/design_system/widgets/drawers.dart';
+import '../../../core/design_system/widgets/form/crm_multi_select_dropdown.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/models/user_model.dart';
 import '../bloc/properties_bloc.dart';
@@ -44,8 +45,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   bool _hasAutoOpenedAdd = false;
   bool _hasAutoOpenedProp = false;
   String? _selectedCategory;
-  String? _selectedConfiguration;
-  String? _selectedArea;
+  final List<String> _selectedConfigurations = [];
+  final List<String> _selectedAreas = [];
   String? _selectedListingType;
   bool? _selectedVerification;
   PropertyMetadataModel? _cachedMetadata;
@@ -424,11 +425,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               final matchesCategory = _selectedCategory == null ||
                   p.categoryId == _selectedCategory;
 
-              final matchesConfig = _selectedConfiguration == null ||
-                  p.configurationId == _selectedConfiguration;
+              final matchesConfig = _selectedConfigurations.isEmpty ||
+                  _selectedConfigurations.contains(p.configurationId);
 
-              final matchesArea = _selectedArea == null ||
-                  p.areaId == _selectedArea;
+              final matchesArea = _selectedAreas.isEmpty ||
+                  _selectedAreas.contains(p.areaId);
 
               bool matchesPrice = true;
               if (_selectedPriceSortOrRange == 'custom') {
@@ -1122,45 +1123,17 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         }
       }
 
-      if (bhkSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'BHK Distribution',
-            sectors: bhkSectors,
-          ),
-        ));
-      }
-
-      if (activeSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Availability Status',
-            sectors: activeSectors,
-          ),
-        ));
-      }
+      widgets.add(SizedBox(
+        width: chartCardWidth,
+        height: cardHeight,
+        child: CRMChartCard(
+          title: 'BHK Distribution',
+          sectors: bhkSectors,
+        ),
+      ));
     } else if (_activeCategoryTab == 'Commercial') {
       final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
-      final offices = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('office') || p.title.toLowerCase().contains('office') || (p.description != null && p.description!.toLowerCase().contains('office'))).toList();
-      final shops = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('shop') || p.categoryName.toLowerCase().contains('retail') || p.categoryName.toLowerCase().contains('showroom') || p.title.toLowerCase().contains('shop') || p.title.toLowerCase().contains('showroom') || (p.description != null && p.description!.toLowerCase().contains('shop'))).toList();
       
-      final otherCount = active - (offices.where((p) => p.propertyStatusName == 'Available').length + shops.where((p) => p.propertyStatusName == 'Available').length);
-
-      final comSectors = <ChartSector>[];
-      if (offices.isNotEmpty) {
-        comSectors.add(ChartSector(label: 'Office Spaces', value: offices.length.toDouble(), color: CRMColors.info));
-      }
-      if (shops.isNotEmpty) {
-        comSectors.add(ChartSector(label: 'Shops & Retail', value: shops.length.toDouble(), color: CRMColors.success));
-      }
-      if (otherCount > 0) {
-        comSectors.add(ChartSector(label: 'Other Commercial', value: otherCount.toDouble(), color: CRMColors.warning));
-      }
-
       widgets.add(SizedBox(
         width: cardWidth,
         height: cardHeight,
@@ -1171,17 +1144,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
           iconColor: CRMColors.primaryOf(context),
         ),
       ));
-
-      if (comSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Commercial Subcategories',
-            sectors: comSectors,
-          ),
-        ));
-      }
 
       final Map<String, int> typeCounts = {};
       for (final p in filteredByListingAndCategory) {
@@ -1210,16 +1172,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         }
       });
 
-      if (typeSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Property Types',
-            sectors: typeSectors,
-          ),
-        ));
-      }
+      widgets.add(SizedBox(
+        width: chartCardWidth,
+        height: cardHeight,
+        child: CRMChartCard(
+          title: 'Property Types',
+          sectors: typeSectors,
+        ),
+      ));
     } else if (_activeCategoryTab == 'Industrial') {
       final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
       final warehouses = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('warehouse') || p.title.toLowerCase().contains('warehouse') || (p.description != null && p.description!.toLowerCase().contains('warehouse'))).toList();
@@ -1249,54 +1209,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ),
       ));
 
-      if (indSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Industrial Subcategories',
-            sectors: indSectors,
-          ),
-        ));
-      }
-
-      final Map<String, int> typeCounts = {};
-      for (final p in filteredByListingAndCategory) {
-        final typeName = p.propertyTypeName;
-        if (typeName.isNotEmpty && typeName != 'N/A') {
-          typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
-        }
-      }
-      final List<ChartSector> typeSectors = [];
-      final typeColors = [
-        CRMColors.primaryOf(context),
-        CRMColors.info,
-        CRMColors.success,
-        CRMColors.warning,
-        CRMColors.danger,
-      ];
-      int index = 0;
-      typeCounts.forEach((name, count) {
-        if (count > 0) {
-          typeSectors.add(ChartSector(
-            label: name,
-            value: count.toDouble(),
-            color: typeColors[index % typeColors.length],
-          ));
-          index++;
-        }
-      });
-
-      if (typeSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Property Types',
-            sectors: typeSectors,
-          ),
-        ));
-      }
+      widgets.add(SizedBox(
+        width: chartCardWidth,
+        height: cardHeight,
+        child: CRMChartCard(
+          title: 'Industrial Subcategories',
+          sectors: indSectors,
+        ),
+      ));
     } else if (_activeCategoryTab == 'Land & Plot') {
       final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
       final resPlots = filteredByListingAndCategory.where((p) => p.title.toLowerCase().contains('resident') || (p.description != null && p.description!.toLowerCase().contains('resident'))).toList();
@@ -1325,54 +1245,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ),
       ));
 
-      if (landSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Zoning & Land Usage',
-            sectors: landSectors,
-          ),
-        ));
-      }
-
-      final Map<String, int> typeCounts = {};
-      for (final p in filteredByListingAndCategory) {
-        final typeName = p.propertyTypeName;
-        if (typeName.isNotEmpty && typeName != 'N/A') {
-          typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
-        }
-      }
-      final List<ChartSector> typeSectors = [];
-      final typeColors = [
-        CRMColors.primaryOf(context),
-        CRMColors.info,
-        CRMColors.success,
-        CRMColors.warning,
-        CRMColors.danger,
-      ];
-      int index = 0;
-      typeCounts.forEach((name, count) {
-        if (count > 0) {
-          typeSectors.add(ChartSector(
-            label: name,
-            value: count.toDouble(),
-            color: typeColors[index % typeColors.length],
-          ));
-          index++;
-        }
-      });
-
-      if (typeSectors.isNotEmpty) {
-        widgets.add(SizedBox(
-          width: chartCardWidth,
-          height: cardHeight,
-          child: CRMChartCard(
-            title: 'Property Types',
-            sectors: typeSectors,
-          ),
-        ));
-      }
+      widgets.add(SizedBox(
+        width: chartCardWidth,
+        height: cardHeight,
+        child: CRMChartCard(
+          title: 'Zoning & Land Usage',
+          sectors: landSectors,
+        ),
+      ));
     }
 
     final categories = ['Residential', 'Commercial', 'Industrial', 'Land & Plot'];
@@ -1425,7 +1305,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
 
   Widget _buildSearchAndFilters(PropertyMetadataModel? metadata) {
     final categories = metadata != null ? metadata.categories : <LookupItem>[];
-    final areas = metadata != null ? metadata.areas : <AreaLookup>[];
+    final areas = metadata != null ? metadata.areas.cast<LookupItem>().toList() : <LookupItem>[];
     final listingTypes =
         metadata != null ? metadata.listingTypes : <LookupItem>[];
 
@@ -1496,142 +1376,315 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   targetWidth = width;
                 }
 
-                final configurations = metadata != null
-                    ? metadata.configurations.where((c) {
-                        if (_selectedCategory == null) return true;
+                final List<LookupItem> configurations = [];
+                if (metadata != null) {
+                  if (_selectedCategory == null) {
+                    configurations.addAll(metadata.configurations);
+                  } else {
+                    final cat = categories.firstWhere(
+                      (cat) => cat.id == _selectedCategory,
+                      orElse: () => LookupItem(id: '', name: ''),
+                    );
+                    final catName = cat.name.toLowerCase();
 
-                        final cat = categories.firstWhere(
-                          (cat) => cat.id == _selectedCategory,
-                          orElse: () => LookupItem(id: '', name: ''),
-                        );
-                        final catName = cat.name.toLowerCase();
-                        final configName = c.name.toLowerCase();
-
-                        if (catName.contains('residential')) {
-                          return configName == '1 rk' ||
-                              configName == '1 bhk' ||
-                              configName == '2 bhk' ||
-                              configName == '3 bhk' ||
-                              configName == '4 bhk' ||
-                              configName == '5 bhk' ||
-                              configName == 'villa' ||
-                              configName == 'duplex' ||
-                              configName == 'penthouse';
-                        } else if (catName.contains('commercial')) {
-                          return configName == 'office' ||
-                              configName == 'shop' ||
-                              configName == 'showroom';
-                        } else if (catName.contains('land') || catName.contains('plot')) {
-                          return configName == 'plot';
-                        } else if (catName.contains('industrial')) {
-                          return configName == 'warehouse' ||
-                              configName == 'industrial shed';
+                    if (catName.contains('commercial')) {
+                      final matches = <LookupItem>[];
+                      matches.addAll(metadata.configurations.where((c) {
+                        final name = c.name.toLowerCase();
+                        return name.contains('office') || name.contains('shop') || name.contains('showroom');
+                      }));
+                      matches.addAll(metadata.types.where((t) {
+                        final name = t.name.toLowerCase();
+                        return name.contains('office') || name.contains('shop') || name.contains('showroom');
+                      }));
+                      for (final m in matches) {
+                        if (!configurations.any((c) => c.name.toLowerCase() == m.name.toLowerCase())) {
+                          configurations.add(m);
                         }
+                      }
+                    } else if (catName.contains('land') || catName.contains('plot')) {
+                      final matches = <LookupItem>[];
+                      matches.addAll(metadata.configurations.where((c) {
+                        return c.name.toLowerCase().contains('plot');
+                      }));
+                      matches.addAll(metadata.types.where((t) {
+                        return t.name.toLowerCase().contains('plot');
+                      }));
+                      for (final m in matches) {
+                        if (!configurations.any((c) => c.name.toLowerCase() == m.name.toLowerCase())) {
+                          configurations.add(m);
+                        }
+                      }
+                    } else if (catName.contains('industrial')) {
+                      final matches = <LookupItem>[];
+                      matches.addAll(metadata.configurations.where((c) {
+                        final name = c.name.toLowerCase();
+                        return name.contains('warehouse') || name.contains('shed') || name.contains('industrial');
+                      }));
+                      matches.addAll(metadata.types.where((t) {
+                        final name = t.name.toLowerCase();
+                        return name.contains('warehouse') || name.contains('shed') || name.contains('industrial');
+                      }));
+                      for (final m in matches) {
+                        if (!configurations.any((c) => c.name.toLowerCase() == m.name.toLowerCase())) {
+                          configurations.add(m);
+                        }
+                      }
+                    } else if (catName.contains('residential')) {
+                      final matches = metadata.configurations.where((c) {
+                        final name = c.name.toLowerCase();
+                        return !name.contains('office') &&
+                            !name.contains('shop') &&
+                            !name.contains('showroom') &&
+                            !name.contains('plot') &&
+                            !name.contains('warehouse') &&
+                            !name.contains('shed') &&
+                            !name.contains('industrial');
+                      }).toList();
+                      for (final m in matches) {
+                        if (!configurations.any((c) => c.name.toLowerCase() == m.name.toLowerCase())) {
+                          configurations.add(m);
+                        }
+                      }
+                    } else {
+                      configurations.addAll(metadata.configurations.where((c) => c.categoryId == _selectedCategory));
+                    }
+                  }
+                }
 
-                        return c.categoryId == _selectedCategory;
-                      }).toList()
-                    : <LookupItem>[];
+                final bool isWide = width >= 800;
 
-                return Wrap(
-                  spacing: CRMSpacing.m,
-                  runSpacing: CRMSpacing.m,
-                  children: [
-                    _buildDropdown(
-                      label: 'Category',
-                      value: _selectedCategory,
-                      items: categories
-                          .map((c) => DropdownMenuItem<String>(
-                              value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedCategory = val;
-                          _selectedConfiguration = null;
-                          _currentPage = 0;
-                        });
-                        _loadProperties();
-                      },
-                      width: targetWidth,
-                    ),
-                    _buildDropdown(
-                      label: 'Configuration',
-                      value: _selectedConfiguration,
-                      items: configurations
-                          .map((c) => DropdownMenuItem<String>(
-                              value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedConfiguration = val;
-                          _currentPage = 0;
-                        });
-                        _loadProperties();
-                      },
-                      width: targetWidth,
-                    ),
-                    _buildDropdown(
-                      label: 'Area',
-                      value: _selectedArea,
-                      items: areas
-                          .map((a) => DropdownMenuItem<String>(
-                              value: a.id, child: Text(a.name)))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedArea = val;
-                          _currentPage = 0;
-                        });
-                        _loadProperties();
-                      },
-                      width: targetWidth,
-                    ),
-                    _buildDropdown(
-                      label: 'Price Range',
-                      value: _selectedPriceSortOrRange,
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: 'l2h',
-                          child: Text('Low to High'),
+                if (isWide) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildDropdown(
+                          label: 'Category',
+                          value: _selectedCategory,
+                          items: categories
+                              .map((c) => DropdownMenuItem<String>(
+                                  value: c.id, child: Text(c.name)))
+                              .toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedCategory = val;
+                              _selectedConfigurations.clear();
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          },
+                          width: double.infinity,
                         ),
-                        const DropdownMenuItem<String>(
-                          value: 'h2l',
-                          child: Text('High to Low'),
+                      ),
+                      const SizedBox(width: CRMSpacing.m),
+                      Expanded(
+                        child: CRMMultiSelectDropdown(
+                          label: (() {
+                            if (_selectedCategory != null) {
+                              final cat = categories.firstWhere(
+                                (c) => c.id == _selectedCategory,
+                                orElse: () => LookupItem(id: '', name: ''),
+                              );
+                              final catName = cat.name.toLowerCase();
+                              if (catName.contains('commercial') ||
+                                  catName.contains('industrial') ||
+                                  catName.contains('land') ||
+                                  catName.contains('plot')) {
+                                return 'Property Type';
+                              }
+                            }
+                            return 'Configuration';
+                          })(),
+                          selectedIds: _selectedConfigurations,
+                          items: configurations,
+                          onChanged: (vals) {
+                            setState(() {
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          },
                         ),
-                        DropdownMenuItem<String>(
-                          value: 'custom',
-                          child: Text(
-                            _minPrice != null || _maxPrice != null
-                                ? 'Custom: ₹${_minPrice != null ? BudgetFormatter.format(_minPrice!) : '0'} - ₹${_maxPrice != null ? BudgetFormatter.format(_maxPrice!) : 'Max'}'
-                                : 'Custom Range...',
+                      ),
+                      const SizedBox(width: CRMSpacing.m),
+                      Expanded(
+                        child: CRMMultiSelectDropdown(
+                          label: 'Area',
+                          selectedIds: _selectedAreas,
+                          items: areas,
+                          onChanged: (vals) {
+                            setState(() {
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: CRMSpacing.m),
+                      Expanded(
+                        child: _buildDropdown(
+                          label: 'Price Range',
+                          value: _selectedPriceSortOrRange,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: 'l2h',
+                              child: Text('Low to High'),
+                            ),
+                            const DropdownMenuItem<String>(
+                              value: 'h2l',
+                              child: Text('High to Low'),
+                            ),
+                            DropdownMenuItem<String>(
+                              value: 'custom',
+                              child: Text(
+                                _minPrice != null || _maxPrice != null
+                                    ? 'Custom: ₹${_minPrice != null ? BudgetFormatter.format(_minPrice!) : '0'} - ₹${_maxPrice != null ? BudgetFormatter.format(_maxPrice!) : 'Max'}'
+                                    : 'Custom Range...',
+                              ),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val == 'custom') {
+                              _showCustomPriceRangeDialog();
+                            } else {
+                              setState(() {
+                                _selectedPriceSortOrRange = val;
+                                _minPrice = null;
+                                _maxPrice = null;
+                                _currentPage = 0;
+                              });
+                              _loadProperties();
+                            }
+                          },
+                          width: double.infinity,
+                        ),
+                      ),
+                      const SizedBox(width: CRMSpacing.m),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: CRMButton(
+                            label: 'Clear Filters',
+                            variant: CRMButtonVariant.outline,
+                            onPressed: _clearFilters,
                           ),
                         ),
-                      ],
-                      onChanged: (val) {
-                        if (val == 'custom') {
-                          _showCustomPriceRangeDialog();
-                        } else {
+                      ),
+                    ],
+                  );
+                } else {
+                  final double columnWidth = width < 500 ? width : (width - CRMSpacing.m) / 2;
+                  return Wrap(
+                    spacing: CRMSpacing.m,
+                    runSpacing: CRMSpacing.m,
+                    children: [
+                      _buildDropdown(
+                        label: 'Category',
+                        value: _selectedCategory,
+                        items: categories
+                            .map((c) => DropdownMenuItem<String>(
+                                value: c.id, child: Text(c.name)))
+                            .toList(),
+                        onChanged: (val) {
                           setState(() {
-                            _selectedPriceSortOrRange = val;
-                            _minPrice = null;
-                            _maxPrice = null;
+                            _selectedCategory = val;
+                            _selectedConfigurations.clear();
                             _currentPage = 0;
                           });
                           _loadProperties();
-                        }
-                      },
-                      width: targetWidth,
-                    ),
-                    SizedBox(
-                      width: targetWidth,
-                      height: 48,
-                      child: CRMButton(
-                        label: 'Clear Filters',
-                        variant: CRMButtonVariant.outline,
-                        onPressed: _clearFilters,
+                        },
+                        width: columnWidth,
                       ),
-                    ),
-                  ],
-                );
+                      SizedBox(
+                        width: columnWidth,
+                        child: CRMMultiSelectDropdown(
+                          label: (() {
+                            if (_selectedCategory != null) {
+                              final cat = categories.firstWhere(
+                                (c) => c.id == _selectedCategory,
+                                orElse: () => LookupItem(id: '', name: ''),
+                              );
+                              final catName = cat.name.toLowerCase();
+                              if (catName.contains('commercial') ||
+                                  catName.contains('industrial') ||
+                                  catName.contains('land') ||
+                                  catName.contains('plot')) {
+                                return 'Property Type';
+                              }
+                            }
+                            return 'Configuration';
+                          })(),
+                          selectedIds: _selectedConfigurations,
+                          items: configurations,
+                          onChanged: (vals) {
+                            setState(() {
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: columnWidth,
+                        child: CRMMultiSelectDropdown(
+                          label: 'Area',
+                          selectedIds: _selectedAreas,
+                          items: areas,
+                          onChanged: (vals) {
+                            setState(() {
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          },
+                        ),
+                      ),
+                      _buildDropdown(
+                        label: 'Price Range',
+                        value: _selectedPriceSortOrRange,
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: 'l2h',
+                            child: Text('Low to High'),
+                          ),
+                          const DropdownMenuItem<String>(
+                            value: 'h2l',
+                            child: Text('High to Low'),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'custom',
+                            child: Text(
+                              _minPrice != null || _maxPrice != null
+                                  ? 'Custom: ₹${_minPrice != null ? BudgetFormatter.format(_minPrice!) : '0'} - ₹${_maxPrice != null ? BudgetFormatter.format(_maxPrice!) : 'Max'}'
+                                  : 'Custom Range...',
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val == 'custom') {
+                            _showCustomPriceRangeDialog();
+                          } else {
+                            setState(() {
+                              _selectedPriceSortOrRange = val;
+                              _minPrice = null;
+                              _maxPrice = null;
+                              _currentPage = 0;
+                            });
+                            _loadProperties();
+                          }
+                        },
+                        width: columnWidth,
+                      ),
+                      SizedBox(
+                        width: columnWidth,
+                        height: 48,
+                        child: CRMButton(
+                          label: 'Clear Filters',
+                          variant: CRMButtonVariant.outline,
+                          onPressed: _clearFilters,
+                        ),
+                      ),
+                    ],
+                  );
+                }
               },
             ),
           ],
@@ -1673,8 +1726,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     setState(() {
       _searchController.clear();
       _selectedCategory = null;
-      _selectedConfiguration = null;
-      _selectedArea = null;
+      _selectedConfigurations.clear();
+      _selectedAreas.clear();
       _selectedListingType = null;
       _selectedVerification = null;
       _activeListingTab = 'Rent';
@@ -2058,7 +2111,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   }
 }
 
-class CRMChartCard extends StatelessWidget {
+class CRMChartCard extends StatefulWidget {
   final String title;
   final List<ChartSector> sectors;
 
@@ -2069,85 +2122,266 @@ class CRMChartCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<CRMChartCard> createState() => _CRMChartCardState();
+}
+
+class _CRMChartCardState extends State<CRMChartCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _sweepAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _sweepAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant CRMChartCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only re-animate when title changes or sector data actually changes
+    bool sectorsChanged = oldWidget.title != widget.title ||
+        oldWidget.sectors.length != widget.sectors.length;
+    if (!sectorsChanged) {
+      for (int i = 0; i < oldWidget.sectors.length; i++) {
+        if (oldWidget.sectors[i].label != widget.sectors[i].label ||
+            oldWidget.sectors[i].value != widget.sectors[i].value) {
+          sectorsChanged = true;
+          break;
+        }
+      }
+    }
+    if (sectorsChanged) {
+      _controller.reset();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bgColor = theme.brightness == Brightness.dark
-        ? const Color(0xFF1E293B)
-        : Colors.white;
-    final titleColor = theme.brightness == Brightness.dark
-        ? const Color(0xFFF8FAFC)
-        : const Color(0xFF1E293B);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final titleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
-    return CRMCard(
-      elevated: true,
+    final sectorsToShow = widget.sectors.isNotEmpty
+        ? widget.sectors
+        : [ChartSector(label: 'No Listings', value: 1.0, color: Colors.grey.shade400)];
+
+    final total = sectorsToShow.fold<double>(0, (s, e) => s + e.value);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [Colors.white, const Color(0xFFF8FAFC)],
+        ),
+        borderRadius: BorderRadius.circular(CRMBorderRadius.card),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.08)
+              : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : const Color(0xFF64748B).withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+            spreadRadius: -2,
+          ),
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.15)
+                : const Color(0xFF64748B).withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       padding: EdgeInsets.all(isMobile ? CRMSpacing.s : CRMSpacing.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: titleColor,
-            ),
-            textAlign: TextAlign.center,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 3,
+                height: 12,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      CRMColors.primaryOf(context),
+                      CRMColors.primaryOf(context).withOpacity(0.4),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                widget.title,
+                style: TextStyle(
+                  fontSize: isMobile ? 11 : 12,
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Expanded(
-            child: Row(
-              children: [
-                SizedBox(
-                  width: isMobile ? 65 : 80,
-                  height: isMobile ? 65 : 80,
-                  child: CustomPaint(
-                    painter: DonutChartPainter(
-                      sectors: sectors,
-                      backgroundColor: bgColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: sectors.map((s) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 1.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: s.color,
-                                borderRadius: BorderRadius.circular(1.5),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${s.label}: ${s.value.toInt()}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: titleColor.withOpacity(0.8),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                return Row(
+                  children: [
+                    // 3D Donut Chart
+                    SizedBox(
+                      width: isMobile ? 56 : 72,
+                      height: isMobile ? 56 : 72,
+                      child: CustomPaint(
+                        painter: DonutChart3DPainter(
+                          sectors: sectorsToShow,
+                          backgroundColor: bgColor,
+                          animationValue: _sweepAnimation.value,
+                          isDark: isDark,
                         ),
-                      )).toList(),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                    const SizedBox(width: 10),
+                    // Animated legend
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: List.generate(sectorsToShow.length, (i) {
+                            final s = sectorsToShow[i];
+                            final pct = total > 0 ? s.value / total : 0.0;
+                            // Stagger each legend item
+                            final itemDelay = 0.4 + (i * 0.08);
+                            final itemEnd = (itemDelay + 0.3).clamp(0.0, 1.0);
+                            final itemProgress = Curves.easeOut.transform(
+                              (((_controller.value - itemDelay) / (itemEnd - itemDelay))
+                                  .clamp(0.0, 1.0)),
+                            );
+
+                            return Opacity(
+                              opacity: itemProgress,
+                              child: Transform.translate(
+                                offset: Offset(8 * (1 - itemProgress), 0),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 1.5),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: s.color,
+                                          borderRadius: BorderRadius.circular(2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: s.color.withOpacity(0.4),
+                                              blurRadius: 3,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              s.label == 'No Listings'
+                                                  ? 'No Listings'
+                                                  : '${s.label}: ${s.value.toInt()}',
+                                              style: TextStyle(
+                                                fontSize: isMobile ? 9 : 10,
+                                                color: titleColor.withOpacity(0.85),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            // Animated progress bar
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(2),
+                                              child: SizedBox(
+                                                height: 3,
+                                                child: Stack(
+                                                  children: [
+                                                    Container(
+                                                      color: subtitleColor.withOpacity(0.1),
+                                                    ),
+                                                    FractionallySizedBox(
+                                                      widthFactor: pct * _sweepAnimation.value,
+                                                      child: Container(
+                                                        decoration: BoxDecoration(
+                                                          gradient: LinearGradient(
+                                                            colors: [
+                                                              s.color,
+                                                              s.color.withOpacity(0.6),
+                                                            ],
+                                                          ),
+                                                          borderRadius: BorderRadius.circular(2),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -2186,11 +2420,18 @@ class ChartSector {
   });
 }
 
-class DonutChartPainter extends CustomPainter {
+class DonutChart3DPainter extends CustomPainter {
   final List<ChartSector> sectors;
   final Color backgroundColor;
+  final double animationValue;
+  final bool isDark;
 
-  DonutChartPainter({required this.sectors, required this.backgroundColor});
+  DonutChart3DPainter({
+    required this.sectors,
+    required this.backgroundColor,
+    required this.animationValue,
+    required this.isDark,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2198,34 +2439,75 @@ class DonutChartPainter extends CustomPainter {
     if (total == 0) return;
 
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width < size.height ? size.width / 2 : size.height / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
+    final radius = (size.width < size.height ? size.width / 2 : size.height / 2) - 2;
+    final strokeWidth = radius * 0.38;
+    final outerRadius = radius;
+    final innerRadius = radius - strokeWidth;
 
-    double startAngle = -3.1415926535 / 2; // Start from top
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
+    // --- 3D Shadow / Depth layers ---
+    for (int i = 3; i >= 1; i--) {
+      final shadowPaint = Paint()
+        ..color = (isDark ? Colors.black : const Color(0xFF94A3B8))
+            .withOpacity(0.06 * i)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth + (i * 1.5)
+        ..isAntiAlias = true;
+      final shadowOffset = Offset(0, i * 0.8);
+      canvas.drawCircle(center + shadowOffset, outerRadius - strokeWidth / 2, shadowPaint);
+    }
+
+    // --- Draw animated sectors as thick arcs with gradient ---
+    final animatedSweepTotal = 2 * math.pi * animationValue;
+    double startAngle = -math.pi / 2;
 
     for (final sector in sectors) {
-      final sweepAngle = (sector.value / total) * 2 * 3.1415926535;
-      paint.color = sector.color;
-      canvas.drawArc(rect, startAngle, sweepAngle, true, paint);
+      final sweepAngle = (sector.value / total) * animatedSweepTotal;
+      final midAngle = startAngle + sweepAngle / 2;
 
-      // Draw percentage text inside the sector if it's large enough
-      if (sweepAngle > 0.15) {
-        final middleAngle = startAngle + sweepAngle / 2;
-        final textRadius = radius * 0.7; // Inner position for label
-        final textX = center.dx + textRadius * math.cos(middleAngle);
-        final textY = center.dy + textRadius * math.sin(middleAngle);
+      // Gradient arc paint
+      final arcPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.butt
+        ..isAntiAlias = true;
 
+      // Create a sweep gradient for the sector for a richer look
+      final darkerColor = Color.lerp(sector.color, Colors.black, 0.25)!;
+      final lighterColor = Color.lerp(sector.color, Colors.white, 0.2)!;
+      arcPaint.shader = ui.Gradient.sweep(
+        center,
+        [lighterColor, sector.color, darkerColor, sector.color],
+        [0.0, 0.3, 0.7, 1.0],
+        TileMode.clamp,
+        startAngle,
+        startAngle + sweepAngle,
+      );
+
+      final arcRect = Rect.fromCircle(center: center, radius: outerRadius - strokeWidth / 2);
+      canvas.drawArc(arcRect, startAngle, sweepAngle, false, arcPaint);
+
+      // Draw percentage text for large sectors
+      if (sweepAngle > 0.4 && animationValue > 0.5) {
+        final textOpacity = ((animationValue - 0.5) * 2).clamp(0.0, 1.0);
+        final textRadius = outerRadius - strokeWidth / 2;
+        final textX = center.dx + textRadius * math.cos(midAngle);
+        final textY = center.dy + textRadius * math.sin(midAngle);
         final percentage = (sector.value / total * 100).toStringAsFixed(0);
+
         final textPainter = TextPainter(
           text: TextSpan(
             text: '$percentage%',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
+            style: TextStyle(
+              color: Colors.white.withOpacity(textOpacity),
+              fontSize: (strokeWidth * 0.38).clamp(7.0, 11.0),
+              fontWeight: FontWeight.w800,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
           ),
           textDirection: ui.TextDirection.ltr,
@@ -2240,15 +2522,52 @@ class DonutChartPainter extends CustomPainter {
       startAngle += sweepAngle;
     }
 
-    // Draw center hole to make it a donut chart
-    final centerPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius * 0.45, centerPaint);
+    // --- Inner circle (center hole) with subtle gradient for depth ---
+    final innerGradient = ui.Gradient.radial(
+      Offset(center.dx - innerRadius * 0.2, center.dy - innerRadius * 0.2),
+      innerRadius,
+      isDark
+          ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+          : [Colors.white, const Color(0xFFF1F5F9)],
+      [0.0, 1.0],
+    );
+    final innerPaint = Paint()
+      ..shader = innerGradient
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    canvas.drawCircle(center, innerRadius - 1, innerPaint);
+
+    // Subtle inner ring border
+    final innerRingPaint = Paint()
+      ..color = (isDark ? Colors.white : const Color(0xFF94A3B8)).withOpacity(0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5
+      ..isAntiAlias = true;
+    canvas.drawCircle(center, innerRadius - 1, innerRingPaint);
+
+    // --- Glossy highlight overlay on top half ---
+    final highlightRect = Rect.fromCircle(center: center, radius: outerRadius - strokeWidth / 2);
+    final highlightPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 0.4
+      ..isAntiAlias = true
+      ..shader = ui.Gradient.linear(
+        Offset(center.dx, center.dy - outerRadius),
+        center,
+        [
+          Colors.white.withOpacity(isDark ? 0.08 : 0.18),
+          Colors.white.withOpacity(0.0),
+        ],
+      );
+    canvas.drawArc(highlightRect, -math.pi, math.pi, false, highlightPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DonutChart3DPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue ||
+        oldDelegate.sectors != sectors ||
+        oldDelegate.isDark != isDark;
+  }
 }
 
 class HoverChartTooltip extends StatefulWidget {
@@ -2274,129 +2593,137 @@ class _HoverChartTooltipState extends State<HoverChartTooltip> {
 
   void _showOverlay() {
     if (widget.sectors.isEmpty) return;
-    _overlayEntry = OverlayEntry(
-      builder: (context) {
-        final theme = Theme.of(context);
-        final bgColor = theme.brightness == Brightness.dark
-            ? const Color(0xFF1E293B)
-            : Colors.white;
-        final borderColor = theme.brightness == Brightness.dark
-            ? const Color(0xFF334155)
-            : const Color(0xFFE2E8F0);
-        final titleColor = theme.brightness == Brightness.dark
-            ? const Color(0xFFF8FAFC)
-            : const Color(0xFF1E293B);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isHovered || _overlayEntry != null) return;
+      _overlayEntry = OverlayEntry(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final bgColor = theme.brightness == Brightness.dark
+              ? const Color(0xFF1E293B)
+              : Colors.white;
+          final borderColor = theme.brightness == Brightness.dark
+              ? const Color(0xFF334155)
+              : const Color(0xFFE2E8F0);
+          final titleColor = theme.brightness == Brightness.dark
+              ? const Color(0xFFF8FAFC)
+              : const Color(0xFF1E293B);
 
-        return Positioned(
-          width: 320,
-          height: 180,
-          child: CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            offset: const Offset(0, -190), // Show above the card
-            child: MouseRegion(
-              onEnter: (_) {
-                _isHovered = true;
-              },
-              onExit: (_) {
-                _isHovered = false;
-                _hideOverlay();
-              },
-              child: Material(
-                elevation: 12,
-                color: bgColor,
-                borderRadius: BorderRadius.circular(12),
-                shadowColor: Colors.black.withOpacity(0.15),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        widget.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: titleColor,
+          return Positioned(
+            width: 320,
+            height: 180,
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(0, -190), // Show above the card
+              child: MouseRegion(
+                onEnter: (_) {
+                  _isHovered = true;
+                },
+                onExit: (_) {
+                  _isHovered = false;
+                  _hideOverlay();
+                },
+                child: Material(
+                  elevation: 12,
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  shadowColor: Colors.black.withOpacity(0.15),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: titleColor,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 110,
-                              height: 110,
-                              child: CustomPaint(
-                                painter: DonutChartPainter(
-                                  sectors: widget.sectors,
-                                  backgroundColor: bgColor,
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 110,
+                                height: 110,
+                                child: CustomPaint(
+                                  painter: DonutChart3DPainter(
+                                    sectors: widget.sectors,
+                                    backgroundColor: bgColor,
+                                    animationValue: 1.0,
+                                    isDark: Theme.of(context).brightness == Brightness.dark,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: widget.sectors.map((s) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: BoxDecoration(
-                                            color: s.color,
-                                            borderRadius: BorderRadius.circular(2),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            '${s.label}: ${s.value.toInt()}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: titleColor.withOpacity(0.8),
-                                              fontWeight: FontWeight.w500,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: widget.sectors.map((s) => Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: s.color,
+                                              borderRadius: BorderRadius.circular(2),
                                             ),
-                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  )).toList(),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${s.label}: ${s.value.toInt()}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: titleColor.withOpacity(0.8),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )).toList(),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
-    Overlay.of(context).insert(_overlayEntry!);
+          );
+        },
+      );
+      Overlay.of(context).insert(_overlayEntry!);
+    });
   }
 
   void _hideOverlay() {
     // Wait briefly to make sure user didn't enter the overlay region
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       if (!_isHovered) {
-        _overlayEntry?.remove();
-        _overlayEntry = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _overlayEntry?.remove();
+          _overlayEntry = null;
+        });
       }
     });
   }

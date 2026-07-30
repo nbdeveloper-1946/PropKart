@@ -868,16 +868,29 @@ class _UsersScreenState extends State<UsersScreen> {
         }
 
         if (users.isEmpty) {
-          return CRMCard(
-            elevated: true,
-            child: Padding(
-              padding: const EdgeInsets.all(CRMSpacing.xl),
-              child: Column(
-                children: [
-                  Text('No Employees Found', style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context))),
-                  const SizedBox(height: CRMSpacing.s),
-                  Text('Try adjusting your filters or add a new employee profile.', style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context))),
-                ],
+          final isInactiveFilter = _selectedStatus.toLowerCase() == 'inactive';
+          return Center(
+            child: CRMCard(
+              elevated: true,
+              child: Padding(
+                padding: const EdgeInsets.all(CRMSpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      isInactiveFilter ? 'No Inactive Employees Found' : 'No Employees Found',
+                      style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: CRMSpacing.s),
+                    Text(
+                      'Try adjusting your filters or add a new employee profile.',
+                      style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -889,9 +902,10 @@ class _UsersScreenState extends State<UsersScreen> {
           );
         }
 
+        final isInactiveFilter = _selectedStatus.toLowerCase() == 'inactive';
         return CRMDataTable(
           isLoading: isLoading,
-          emptyTitle: 'No Employees Found',
+          emptyTitle: isInactiveFilter ? 'No Inactive Employees Found' : 'No Employees Found',
           emptyDescription: 'Try adjusting your filters or add a new employee profile.',
           dataRowMinHeight: 52.0,
           dataRowMaxHeight: 60.0,

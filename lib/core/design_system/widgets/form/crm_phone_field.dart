@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/phone_number.dart';
+import 'package:intl_phone_field/countries.dart';
 import '../../tokens/app_colors.dart';
 import '../../tokens/app_spacing.dart';
 import '../../tokens/app_typography.dart';
@@ -11,15 +14,17 @@ class CRMPhoneField extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final bool isRequired;
   final bool enabled;
+  final ValueChanged<PhoneNumber>? onChanged;
 
   const CRMPhoneField({
     super.key,
     required this.controller,
     required this.labelText,
-    this.hintText = 'e.g. 98765 43210',
+    this.hintText = '9567354680',
     this.validator,
     this.isRequired = false,
     this.enabled = true,
+    this.onChanged,
   });
 
   @override
@@ -28,11 +33,11 @@ class CRMPhoneField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${labelText}${isRequired ? " *" : ""}',
+          '$labelText${isRequired ? " *" : ""}',
           style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
         ),
         const SizedBox(height: CRMSpacing.xs),
-        TextFormField(
+        IntlPhoneField(
           controller: controller,
           enabled: enabled,
           keyboardType: TextInputType.phone,
@@ -42,30 +47,6 @@ class CRMPhoneField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: CRMTypography.body.copyWith(color: CRMColors.textMutedOf(context)),
-            prefixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(width: CRMSpacing.m),
-                Text(
-                  '+91',
-                  style: CRMTypography.body.copyWith(
-                    color: CRMColors.textOf(context),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: CRMSpacing.s),
-                Container(
-                  width: 1,
-                  height: 16,
-                  color: CRMColors.borderOf(context).withOpacity(0.5),
-                ),
-                const SizedBox(width: CRMSpacing.s),
-              ],
-            ),
-            prefixIconConstraints: const BoxConstraints(
-              minWidth: 0,
-              minHeight: 0,
-            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: CRMSpacing.m,
               vertical: CRMSpacing.s,
@@ -84,15 +65,30 @@ class CRMPhoneField extends StatelessWidget {
               borderRadius: BorderRadius.circular(CRMBorderRadius.s),
               borderSide: BorderSide(color: CRMColors.primaryOf(context), width: 1.5),
             ),
+            counterText: '',
           ),
+          initialCountryCode: 'IN',
+          countries: [countries.firstWhere((c) => c.code == 'IN')],
+          disableLengthCheck: true,
+          dropdownTextStyle: CRMTypography.body.copyWith(
+            color: CRMColors.textOf(context),
+            fontWeight: FontWeight.w600,
+          ),
+          flagsButtonPadding: const EdgeInsets.only(left: CRMSpacing.s),
+          dropdownIconPosition: IconPosition.trailing,
+          showCountryFlag: false,
+          showDropdownIcon: false,
+          onChanged: (phone) {
+            onChanged?.call(phone);
+          },
           validator: (v) {
             if (isRequired) {
-              if (v == null || v.trim().isEmpty) {
+              if (v == null || v.number.trim().isEmpty) {
                 return '$labelText is required';
               }
-              return CRMValidators.indianMobile(v);
+              return CRMValidators.indianMobile(v.number);
             }
-            return validator?.call(v);
+            return validator?.call(v?.number ?? '');
           },
         ),
       ],

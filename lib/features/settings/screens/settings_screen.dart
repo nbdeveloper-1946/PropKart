@@ -634,10 +634,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       currentUserEmail = authState.user.email;
       final roleLower = authState.user.role.toLowerCase();
       isAdminOrSuperAdmin = roleLower.contains('admin');
-      final localPart = currentUserEmail.split('@').first;
-      currentUserName = localPart.isNotEmpty 
-          ? '${localPart[0].toUpperCase()}${localPart.substring(1)}'
-          : 'User';
+      currentUserName = authState.user.fullName;
     }
 
     return Scaffold(

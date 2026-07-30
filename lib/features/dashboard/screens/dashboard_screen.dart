@@ -79,9 +79,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final authState = context.watch<AuthBloc>().state;
-    String userEmail = '';
+    String userName = '';
     if (authState is Authenticated) {
-      userEmail = authState.user.email;
+      userName = authState.user.fullName;
     }
 
     final dateString = _getFormattedDate();
@@ -116,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // 1. Welcome Header
-                  _buildWelcomeHeader(userEmail, dateString, greeting),
+                  _buildWelcomeHeader(userName, dateString, greeting),
                   const SizedBox(height: CRMSpacing.l),
 
                   // 2. Responsive Main Content Area
@@ -176,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildWelcomeHeader(String email, String dateString, String greeting) {
+  Widget _buildWelcomeHeader(String name, String dateString, String greeting) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -191,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         Text(
-          email.split('@').first,
+          name,
           style: CRMTypography.pageTitle.copyWith(
             color: CRMColors.textOf(context),
             fontWeight: FontWeight.bold,
