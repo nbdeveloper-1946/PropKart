@@ -4,10 +4,13 @@ import 'package:propkart/core/storage/repository_coordinator.dart';
 import 'package:propkart/core/storage/isar_collections.dart';
 import 'package:propkart/core/storage/model_mappers.dart';
 import 'package:propkart/core/storage/performance_logger.dart';
+import 'package:propkart/core/security/role_guard.dart';
 
 class DashboardRepository {
   final DashboardService _dashboardService = DashboardService();
   final RepositoryCoordinator _coordinator = RepositoryCoordinator();
+
+
 
   Future<DashboardData> getDashboardData() async {
     final start = DateTime.now();
@@ -36,7 +39,20 @@ class DashboardRepository {
     _triggerBackgroundDashboardRefresh();
 
     // Get the dynamic counts of requirements to ensure they are always correct and in sync
-    final localReqs = await _coordinator.requirementLocal.getRequirements();
+    var localReqs = await _coordinator.requirementLocal.getRequirements();
+    final currentUser = RoleGuard.currentUser;
+    if (currentUser != null) {
+      final role = currentUser.role;
+      if (role == 'Admin') {
+        localReqs = localReqs.where((r) =>
+          r.createdBy == currentUser.id || r.adminId == currentUser.id
+        ).toList();
+      } else if (role != 'Super Admin') {
+        localReqs = localReqs.where((r) =>
+          r.createdBy == currentUser.id
+        ).toList();
+      }
+    }
     int rentalReqs = 0;
     int resaleReqs = 0;
     int rentalWonReqs = 0;
@@ -50,7 +66,10 @@ class DashboardRepository {
       final id = item.listingTypeId ?? '';
       final combined = '$name $id'.toLowerCase();
       final isWon = item.status == 'Won' || item.status == 'Closed';
-      final isSiteVisit = item.status == 'Site Visit';
+      final isSiteVisit = item.status == 'Site Visit Done' ||
+          item.status == 'Negotiation' ||
+          item.status == 'Won' ||
+          item.status == 'Closed';
 
       if (combined.contains('rent')) {
         if (isWon) {
@@ -71,6 +90,15 @@ class DashboardRepository {
           resaleSiteVisits++;
         }
       }
+    }
+
+    final allowedReqIds = localReqs.map((r) => r.id).toSet();
+    final allowedClientNames = localReqs.map((r) => r.clientName.toLowerCase()).toSet();
+
+    bool isAllowedItem(String? reqId, String? clientName) {
+      if (reqId != null && reqId.isNotEmpty) return allowedReqIds.contains(reqId);
+      if (clientName != null && clientName.isNotEmpty) return allowedClientNames.contains(clientName.toLowerCase());
+      return false;
     }
 
     if (cachedData != null) {
@@ -100,13 +128,21 @@ class DashboardRepository {
         monthlyGrowth: cachedData.summary.monthlyGrowth,
       );
 
+      final filteredFollowups = cachedData.followups.where((f) =>
+        isAllowedItem(f.requirementId, f.requirementCustomerName)
+      ).toList();
+
+      final filteredSiteVisits = cachedData.siteVisits.where((sv) =>
+        isAllowedItem(sv.requirementId, sv.requirementCustomerName)
+      ).toList();
+
       return DashboardData(
         summary: updatedSummary,
         activity: cachedData.activity,
         recentProperties: cachedData.recentProperties,
         checklist: cachedData.checklist,
-        followups: cachedData.followups,
-        siteVisits: cachedData.siteVisits,
+        followups: filteredFollowups,
+        siteVisits: filteredSiteVisits,
       );
     }
 
@@ -141,13 +177,21 @@ class DashboardRepository {
       monthlyGrowth: model.summary.monthlyGrowth,
     );
 
+    final filteredFollowups = model.followups.where((f) =>
+      isAllowedItem(f.requirementId, f.requirementCustomerName)
+    ).toList();
+
+    final filteredSiteVisits = model.siteVisits.where((sv) =>
+      isAllowedItem(sv.requirementId, sv.requirementCustomerName)
+    ).toList();
+
     return DashboardData(
       summary: updatedSummary,
       activity: model.activity,
       recentProperties: model.recentProperties,
       checklist: model.checklist,
-      followups: model.followups,
-      siteVisits: model.siteVisits,
+      followups: filteredFollowups,
+      siteVisits: filteredSiteVisits,
     );
   }
 

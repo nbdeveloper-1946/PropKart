@@ -221,13 +221,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     // From Won (My Won tab), allow moving back to any earlier pipeline stage.
     if (mappedCurrent == 'Won') return true;
 
-    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Negotiation', 'Won'];
+    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Site Visit Done', 'Negotiation', 'Won'];
     final currentIndex = steps.indexOf(mappedCurrent);
     final newIndex = steps.indexOf(newStatus);
 
     if (currentIndex == -1 || newIndex == -1) return true;
 
-    if (newIndex <= currentIndex + 1 || (mappedCurrent == 'Interested' && newStatus == 'Site Visit')) {
+    if (newIndex <= currentIndex + 1 || 
+        (mappedCurrent == 'Interested' && (newStatus == 'Site Visit' || newStatus == 'Site Visit Done')) ||
+        (mappedCurrent == 'Follow-up' && newStatus == 'Site Visit Done')) {
       return true;
     }
     return false;
@@ -693,6 +695,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                         DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
                         DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
                         DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
@@ -752,6 +755,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                         DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
                         DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
                         DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
@@ -872,10 +876,15 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
-    if (currentUser == null) return true;
-    if (currentUser.role == 'Super Admin' || currentUser.role == 'Admin') return true;
-    if (currentUser.role == 'Sales' && r.adminId == currentUser.adminId) return true;
-    return true;
+    if (currentUser == null) return false;
+    if (currentUser.role == 'Super Admin') return true;
+    if (currentUser.role == 'Admin') {
+      return r.createdBy == currentUser.id || r.adminId == currentUser.id;
+    }
+    if (currentUser.role == 'Sales') {
+      return r.createdBy == currentUser.id;
+    }
+    return false;
   }
 
   Widget _buildRequirementsTable() {
@@ -980,7 +989,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   columns: [
                     const DataColumn(label: Text('Client')),
                     if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
-                      const DataColumn(label: Text('Salesman')),
+                      const DataColumn(label: Text('Added By')),
                     const DataColumn(label: Text('Specs / Config')),
                     const DataColumn(label: Text('Budget Range')),
                     const DataColumn(label: Text('Target Area(s)')),
@@ -1095,6 +1104,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
                               PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
                               PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
@@ -1513,6 +1523,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                           PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
                           PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                          PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                           PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                           PopupMenuItem<String>(value: 'Won', child: Text('Won')),
                           PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
@@ -2323,7 +2334,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   columns: [
                     const DataColumn(label: Text('Client')),
                     if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
-                      const DataColumn(label: Text('Salesman')),
+                      const DataColumn(label: Text('Added By')),
                     const DataColumn(label: Text('Specs / Config')),
                     const DataColumn(label: Text('Budget Range')),
                     const DataColumn(label: Text('Target Area(s)')),
@@ -2424,6 +2435,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
                               PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
                               PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),

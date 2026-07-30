@@ -119,6 +119,7 @@ class RequirementLocal {
   String? listingTypeName;
   String? creatorName;
   String? assigneeName;
+  String? createdBy;
 }
 
 @collection

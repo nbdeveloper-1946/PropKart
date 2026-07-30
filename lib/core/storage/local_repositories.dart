@@ -382,6 +382,13 @@ class RequirementLocalRepository {
       await _isar.requirementLocals.filter().idEqualTo(id).deleteAll();
     });
   }
+
+  Future<RequirementLocal?> getRequirement(String id) async {
+    if (kIsWeb) {
+      return inMemory[id];
+    }
+    return await _isar.requirementLocals.filter().idEqualTo(id).findFirst();
+  }
 }
 
 class FollowupLocalRepository {

@@ -451,7 +451,10 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     p.categoryName.toLowerCase().contains(query) ||
                     (p.configurationName?.toLowerCase().contains(query) ?? false) ||
                     p.propertyTypeName.toLowerCase().contains(query) ||
-                    (isUserAdminOrSuperAdmin && p.createdByName.toLowerCase().contains(query));
+                    (isUserAdminOrSuperAdmin &&
+                     (currentUser?.role == 'Super Admin' ||
+                      (currentUser?.role == 'Admin' && (p.createdBy == currentUser?.id || p.adminId == currentUser?.id))) &&
+                     p.createdByName.toLowerCase().contains(query));
               }
 
               return matchesListing &&
@@ -647,7 +650,12 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold))),
                           if (isUserAdminOrSuperAdmin)
-                            DataCell(Text(p.createdByName)),
+                            DataCell(Text(
+                              (currentUser?.role == 'Super Admin' ||
+                                      (currentUser?.role == 'Admin' && (p.createdBy == currentUser?.id || p.adminId == currentUser?.id)))
+                                  ? p.createdByName
+                                  : '-',
+                            )),
                           DataCell(Text(p.title)),
                           DataCell(
                             Padding(

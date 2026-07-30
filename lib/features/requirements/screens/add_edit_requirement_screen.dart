@@ -304,13 +304,15 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
     String mappedCurrent = currentStatus;
     if (mappedCurrent == 'Active' || mappedCurrent == 'Live') mappedCurrent = 'Interested';
     
-    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Negotiation', 'Won'];
+    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Site Visit Done', 'Negotiation', 'Won'];
     final currentIndex = steps.indexOf(mappedCurrent);
     final newIndex = steps.indexOf(newStatus);
     
     if (currentIndex == -1 || newIndex == -1) return true;
     
-    if (newIndex <= currentIndex + 1 || (mappedCurrent == 'Interested' && newStatus == 'Site Visit')) {
+    if (newIndex <= currentIndex + 1 || 
+        (mappedCurrent == 'Interested' && (newStatus == 'Site Visit' || newStatus == 'Site Visit Done')) ||
+        (mappedCurrent == 'Follow-up' && newStatus == 'Site Visit Done')) {
       return true;
     }
     
@@ -463,8 +465,9 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
       createdAt: widget.requirement?.createdAt ?? DateTime.now(),
       furnishingIds: _selectedFurnishingIds,
       facingIds: _selectedFacingIds,
-      adminId: widget.requirement?.adminId ?? currentUser?.id,
+      adminId: widget.requirement?.adminId ?? (currentUser?.role == 'Admin' ? currentUser?.id : currentUser?.adminId),
       creatorName: widget.requirement?.creatorName ?? currentUser?.fullName,
+      createdBy: widget.requirement?.createdBy ?? currentUser?.id,
     );
 
     _isSaved = true;
@@ -871,6 +874,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
                 DropdownMenuItem(value: "Interested", child: Text("Interested")),
                 DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
                 DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                 DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                 DropdownMenuItem(value: "Won", child: Text("Won")),
                 DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),

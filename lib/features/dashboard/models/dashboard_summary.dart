@@ -231,6 +231,8 @@ class DashboardFollowup {
   final String? propertyCode;
   final String? propertyTitle;
   final String? requirementCustomerName;
+  final String? requirementId;
+  final String? creatorName;
 
   const DashboardFollowup({
     required this.id,
@@ -242,11 +244,14 @@ class DashboardFollowup {
     this.propertyCode,
     this.propertyTitle,
     this.requirementCustomerName,
+    this.requirementId,
+    this.creatorName,
   });
 
   factory DashboardFollowup.fromJson(Map<String, dynamic> json) {
     final property = json['property'] as Map<String, dynamic>?;
     final requirement = json['requirement'] as Map<String, dynamic>?;
+    final creator = json['creator'] as Map<String, dynamic>?;
     return DashboardFollowup(
       id: json['id'] ?? '',
       clientName: json['client_name'] ?? '',
@@ -257,6 +262,8 @@ class DashboardFollowup {
       propertyCode: property?['property_code'],
       propertyTitle: property?['title'],
       requirementCustomerName: requirement?['customer_name'],
+      requirementId: json['requirement_id'] ?? requirement?['id'],
+      creatorName: creator?['full_name'],
     );
   }
 }
@@ -269,6 +276,8 @@ class DashboardSiteVisit {
   final String? propertyCode;
   final String? propertyTitle;
   final String? requirementCustomerName;
+  final String? requirementId;
+  final String? creatorName;
 
   const DashboardSiteVisit({
     required this.id,
@@ -278,11 +287,14 @@ class DashboardSiteVisit {
     this.propertyCode,
     this.propertyTitle,
     this.requirementCustomerName,
+    this.requirementId,
+    this.creatorName,
   });
 
   factory DashboardSiteVisit.fromJson(Map<String, dynamic> json) {
     final property = json['property'] as Map<String, dynamic>?;
     final requirement = json['requirement'] as Map<String, dynamic>?;
+    final creator = json['creator'] as Map<String, dynamic>?;
     return DashboardSiteVisit(
       id: json['id'] ?? '',
       visitDate: json['visit_date'] ?? '',
@@ -291,6 +303,8 @@ class DashboardSiteVisit {
       propertyCode: property?['property_code'],
       propertyTitle: property?['title'],
       requirementCustomerName: requirement?['customer_name'],
+      requirementId: json['requirement_id'] ?? requirement?['id'],
+      creatorName: creator?['full_name'],
     );
   }
 }

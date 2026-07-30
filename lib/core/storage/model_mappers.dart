@@ -222,6 +222,7 @@ extension RequirementLocalExtensions on RequirementLocal {
       listingTypeName: parsedListingTypeName,
       creatorName: creatorName,
       assigneeName: assigneeName,
+      createdBy: createdBy,
     );
   }
 }
@@ -255,7 +256,8 @@ extension RequirementModelExtensions on RequirementModel {
       ..listingTypeId = listingTypeId
       ..listingTypeName = listingTypeName
       ..creatorName = creatorName
-      ..assigneeName = assigneeName;
+      ..assigneeName = assigneeName
+      ..createdBy = createdBy;
   }
 }
 
@@ -483,7 +485,9 @@ extension DashboardDataExtensions on DashboardData {
         'notes': f.notes,
         'status': f.status,
         'property': f.propertyCode != null ? {'property_code': f.propertyCode, 'title': f.propertyTitle} : null,
-        'requirement': f.requirementCustomerName != null ? {'customer_name': f.requirementCustomerName} : null,
+        'requirement': f.requirementCustomerName != null ? {'customer_name': f.requirementCustomerName, 'id': f.requirementId} : null,
+        'requirement_id': f.requirementId,
+        'creator': f.creatorName != null ? {'full_name': f.creatorName} : null,
       }).toList())
       ..siteVisitsJson = jsonEncode(siteVisits.map((sv) => {
         'id': sv.id,
@@ -491,7 +495,9 @@ extension DashboardDataExtensions on DashboardData {
         'remarks': sv.remarks,
         'status': sv.status,
         'property': sv.propertyCode != null ? {'property_code': sv.propertyCode, 'title': sv.propertyTitle} : null,
-        'requirement': sv.requirementCustomerName != null ? {'customer_name': sv.requirementCustomerName} : null,
+        'requirement': sv.requirementCustomerName != null ? {'customer_name': sv.requirementCustomerName, 'id': sv.requirementId} : null,
+        'requirement_id': sv.requirementId,
+        'creator': sv.creatorName != null ? {'full_name': sv.creatorName} : null,
       }).toList())
       ..updatedAt = DateTime.now();
   }

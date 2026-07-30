@@ -125,8 +125,17 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
       List<RequirementModel> parsedList = list.map((r) => RequirementModel.fromJson(r)).toList();
 
-      if (isSales && currentUserId != null) {
-        parsedList = parsedList.where((r) => r.createdBy == currentUserId).toList();
+      if (currentUser != null) {
+        final role = currentUser.role;
+        if (role == 'Admin') {
+          parsedList = parsedList.where((r) =>
+            r.createdBy == currentUserId || r.adminId == currentUserId
+          ).toList();
+        } else if (role != 'Super Admin') {
+          parsedList = parsedList.where((r) =>
+            r.createdBy == currentUserId
+          ).toList();
+        }
       }
 
       setState(() {

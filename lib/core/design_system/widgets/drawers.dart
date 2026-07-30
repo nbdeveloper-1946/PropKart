@@ -61,8 +61,10 @@ class BuildPropertyDetailWidget extends StatelessWidget {
 
     final authState = context.read<AuthBloc>().state;
     bool isUserAdminOrSuperAdmin = false;
+    auth_model.UserModel? currentUser;
     if (authState is Authenticated) {
-      final role = authState.user.role;
+      currentUser = authState.user;
+      final role = currentUser.role;
       isUserAdminOrSuperAdmin = role == 'Admin' || role == 'Super Admin';
     }
 
@@ -91,7 +93,11 @@ class BuildPropertyDetailWidget extends StatelessWidget {
     }
     basicItems.add(PropertyDetailItem('Verification', property.isVerified ? 'Verified' : 'Pending Verification', Icons.verified_outlined));
     if (isUserAdminOrSuperAdmin && _isValidValue(property.createdByName)) {
-      basicItems.add(PropertyDetailItem('Created By', property.createdByName, Icons.person_outline_rounded));
+      final showCreator = currentUser?.role == 'Super Admin' ||
+          (currentUser?.role == 'Admin' && (property.createdBy == currentUser?.id || property.adminId == currentUser?.id));
+      if (showCreator) {
+        basicItems.add(PropertyDetailItem('Created By', property.createdByName, Icons.person_outline_rounded));
+      }
     }
     basicItems.add(PropertyDetailItem('Created At', DateFormat('dd-MM-yyyy').format(property.createdAt), Icons.calendar_today_outlined));
 

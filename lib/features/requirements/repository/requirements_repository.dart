@@ -5,6 +5,7 @@ import 'package:propkart/core/storage/repository_coordinator.dart';
 import 'package:propkart/core/storage/isar_collections.dart';
 import 'package:propkart/core/storage/model_mappers.dart';
 import 'package:propkart/core/storage/performance_logger.dart';
+import 'package:propkart/core/security/role_guard.dart';
 
 class RequirementsRepository {
   final RequirementsService _requirementsService = RequirementsService();
@@ -34,6 +35,23 @@ class RequirementsRepository {
 
     final parseStart = DateTime.now();
     var requirements = localList.map((item) => item.toModel()).toList();
+
+    // Apply RBAC role-based filtering on Requirements
+    final currentUser = RoleGuard.currentUser;
+    if (currentUser != null) {
+      final role = currentUser.role;
+      if (role == 'Admin') {
+        requirements = requirements.where((r) =>
+          r.createdBy == currentUser.id || r.adminId == currentUser.id
+        ).toList();
+      } else if (role != 'Super Admin') {
+        // Sales and other roles can only see their own requirements
+        requirements = requirements.where((r) =>
+          r.createdBy == currentUser.id
+        ).toList();
+      }
+    }
+
     if (listingTypeId != null && listingTypeId.isNotEmpty) {
       requirements = requirements.where((r) => r.listingTypeId == listingTypeId).toList();
     }

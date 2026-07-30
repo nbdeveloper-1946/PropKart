@@ -289,7 +289,10 @@ class RequirementModel {
     if (combined == 'agreement' || combined == 'documentation') return 'Documentation';
     if (combined == 'payment') return 'Payment';
     if (combined == 'possession') return 'Possession';
-    if (combined.contains('sitevisit')) return 'Site Visit Scheduled';
+    if (combined.contains('sitevisit')) {
+      if (combined == 'sitevisitdone') return 'Site Visit Completed';
+      return 'Site Visit Scheduled';
+    }
     if (combined.contains('followup') || combined.contains('interested')) return 'Client Interested';
     if (combined == 'notstarted') return 'Lead Created';
 

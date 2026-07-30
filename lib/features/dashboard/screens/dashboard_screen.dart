@@ -22,6 +22,7 @@ import '../models/dashboard_summary.dart';
 import '../../../core/api/dio_client.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/storage/repository_coordinator.dart';
+import '../../../core/storage/model_mappers.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -254,39 +255,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildKPIGrids(DashboardSummary summary, {required bool isDesktop}) {
     final double screenWidth = MediaQuery.of(context).size.width;
 
-    final int availableVal = _activeTab == 'Rental' ? summary.rentalAvailable : summary.resaleAvailable;
+    final int availableVal = summary.available;
     final int soldVal = summary.resaleSold;
     final int rentedVal = summary.rentalRented;
     final int requirementsVal = _activeTab == 'Rental' ? summary.rentalRequirements : summary.resaleRequirements;
 
+    final authState = context.read<AuthBloc>().state;
+    String role = 'Sales';
+    if (authState is Authenticated) {
+      role = authState.user.role;
+    }
+
+    String availableTitle = 'Available';
+    String siteVisitTitle = 'My Site Visits Done';
+    String requirementsTitle = 'My Requirements';
+    String wonTitle = 'My Won';
+
+    if (role == 'Super Admin') {
+      availableTitle = 'All Properties';
+      siteVisitTitle = 'All Site Visits Done';
+      requirementsTitle = 'All Requirements';
+      wonTitle = 'All Won';
+    } else if (role == 'Admin') {
+      availableTitle = 'Available';
+      siteVisitTitle = 'Team Site Visits Done';
+      requirementsTitle = 'Team Requirements';
+      wonTitle = 'Team Won';
+    }
+
     final List<Widget> cards = [
       CRMKPICard(
-        title: 'Available',
+        title: availableTitle,
         value: '$availableVal',
         icon: Icons.check_circle_outline_rounded,
         iconColor: CRMColors.success,
       ),
       if (_activeTab == 'Re-Sale')
         CRMKPICard(
-          title: 'Site Visit Done',
+          title: siteVisitTitle,
           value: '$soldVal',
           icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.warning,
         ),
       if (_activeTab == 'Rental')
         CRMKPICard(
-          title: 'Site Visit Done',
+          title: siteVisitTitle,
           value: '$rentedVal',
           icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.info,
         ),
       CRMKPICard(
-        title: 'Requirements',
+        title: requirementsTitle,
         value: '$requirementsVal',
         icon: Icons.assignment_turned_in_outlined,
       ),
       CRMKPICard(
-        title: 'My Won',
+        title: wonTitle,
         value: '${_activeTab == 'Rental' ? summary.rentalWonRequirements : summary.resaleWonRequirements}',
         icon: Icons.emoji_events_outlined,
         iconColor: CRMColors.success,
@@ -974,47 +998,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _updateLocalChecklistState(String itemId, bool isCompleted) async {
-    try {
-      final coordinator = RepositoryCoordinator();
-      final localDashboard = await coordinator.dashboardLocal.getDashboard();
-      if (localDashboard != null) {
-        final List<dynamic> list = jsonDecode(localDashboard.checklistJson);
-        bool found = false;
-        for (var i = 0; i < list.length; i++) {
-          if (list[i]['id'] == itemId) {
-            list[i]['is_completed'] = isCompleted;
-            found = true;
-            break;
-          }
-        }
-        if (found) {
-          localDashboard.checklistJson = jsonEncode(list);
-          await coordinator.dashboardLocal.saveDashboard(localDashboard);
-        }
-      }
-    } catch (e) {
-      debugPrint("Failed to update local checklist state: $e");
-    }
-  }
+  Future<void> _updateLocalChecklistState(String itemId, bool isCompleted) async {}
 
-  Future<void> _deleteLocalChecklistItem(String itemId) async {
-    try {
-      final coordinator = RepositoryCoordinator();
-      final localDashboard = await coordinator.dashboardLocal.getDashboard();
-      if (localDashboard != null) {
-        final List<dynamic> list = jsonDecode(localDashboard.checklistJson);
-        final initialLength = list.length;
-        list.removeWhere((item) => item['id'] == itemId);
-        if (list.length != initialLength) {
-          localDashboard.checklistJson = jsonEncode(list);
-          await coordinator.dashboardLocal.saveDashboard(localDashboard);
-        }
-      }
-    } catch (e) {
-      debugPrint("Failed to delete local checklist item: $e");
-    }
-  }
+  Future<void> _deleteLocalChecklistItem(String itemId) async {}
 
   Widget _buildTaskTile(ChecklistItem item) {
     final bool isCompleted = _optimisticChecklistStates.containsKey(item.id)
@@ -1466,22 +1452,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'Scheduled: $formattedDate at $formattedTime',
                   style: CRMTypography.caption.copyWith(color: CRMColors.primary, fontWeight: FontWeight.w600),
                 ),
+                if (context.read<AuthBloc>().state is Authenticated &&
+                    (context.read<AuthBloc>().state as Authenticated).user.role != 'Sales' &&
+                    sv.creatorName != null &&
+                    sv.creatorName!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 12, color: CRMColors.textSecondaryOf(context)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Assigned to: ${sv.creatorName}',
+                        style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondaryOf(context)),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           if (sv.status == 'Pending') ...[
             IconButton(
               icon: Icon(Icons.check_circle_outline_rounded, color: CRMColors.success, size: 20),
-              onPressed: () async {
-                try {
-                  await DioClient.dio.patch('/site-visits/${sv.id}/status', data: {'status': 'Completed'});
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Site visit marked as completed.')),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (dialogContext) {
+                    return AlertDialog(
+                      backgroundColor: CRMColors.cardBgOf(context),
+                      title: Text(
+                        'Site Visit Outcome',
+                        style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context)),
+                      ),
+                      content: Text(
+                        'What was the outcome of this site visit?',
+                        style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context)),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Cancel'),
+                        ),
+                        CRMButton(
+                          label: 'Not Interested',
+                          variant: CRMButtonVariant.outline,
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            await _handleSiteVisitOutcome(sv, 'Not Interested');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        CRMButton(
+                          label: 'Site Visit Done',
+                          variant: CRMButtonVariant.primary,
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            await _handleSiteVisitOutcome(sv, 'Site Visit Done');
+                          },
+                        ),
+                      ],
                     );
-                    context.read<DashboardBloc>().add(RefreshDashboard());
-                  }
-                } catch (_) {}
+                  },
+                );
               },
               tooltip: 'Mark Completed',
             ),
@@ -1489,6 +1521,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleSiteVisitOutcome(DashboardSiteVisit sv, String outcomeStatus) async {
+    try {
+      // 1. Mark the site visit as completed in the backend
+      await DioClient.dio.patch('/site-visits/${sv.id}/status', data: {'status': 'Completed'});
+      
+      // 2. Automatically update the requirement status in the backend and local cache
+      if (sv.requirementId != null) {
+        final localReq = await RepositoryCoordinator().requirementLocal.getRequirement(sv.requirementId!);
+        if (localReq != null) {
+          final model = localReq.toModel();
+          final RequirementsRepository requirementsRepository = RequirementsRepository();
+          await requirementsRepository.updateRequirement(
+            model.copyWith(status: outcomeStatus),
+          );
+        } else {
+          // Fallback: send the update request directly to backend
+          await DioClient.dio.put('/requirements/${sv.requirementId}', data: {
+            'status': outcomeStatus,
+          });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Site visit marked as completed. Requirement updated to $outcomeStatus.'),
+            backgroundColor: CRMColors.success,
+          ),
+        );
+        // Refresh dashboard bloc
+        context.read<DashboardBloc>().add(RefreshDashboard());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update: $e'),
+            backgroundColor: CRMColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildFollowupTile(DashboardFollowup f) {
@@ -1539,6 +1615,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                   const SizedBox(height: 6),
                   Text('Scheduled: $formattedDate at $formattedTime', style: CRMTypography.caption.copyWith(color: CRMColors.primary, fontWeight: FontWeight.w600)),
+                  if (context.read<AuthBloc>().state is Authenticated &&
+                      (context.read<AuthBloc>().state as Authenticated).user.role != 'Sales' &&
+                      f.creatorName != null &&
+                      f.creatorName!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline_rounded, size: 12, color: CRMColors.textSecondaryOf(context)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Assigned to: ${f.creatorName}',
+                          style: CRMTypography.captionBold.copyWith(color: CRMColors.textSecondaryOf(context)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

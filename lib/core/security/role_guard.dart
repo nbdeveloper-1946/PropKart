@@ -1,5 +1,8 @@
+import '../../features/auth/models/user_model.dart';
+
 /// Client-side RBAC helpers. Server must still enforce every mutation.
 class RoleGuard {
+  static UserModel? currentUser;
   static bool isSuperAdmin(String? role) =>
       (role ?? '').toLowerCase() == 'super admin';
 

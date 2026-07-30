@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../repository/auth_repository.dart';
 import '../../../core/network/sync_manager.dart';
 import '../../../core/storage/session_cleanup.dart';
+import '../../../core/security/role_guard.dart';
 
 // ==========================================
 // Auth Events
@@ -107,14 +108,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isAuth = await _authRepository.isAuthenticated();
       if (isAuth) {
         final user = await _authRepository.getProfile();
+        RoleGuard.currentUser = user;
         try {
           await SyncManager().connectAfterAuth();
         } catch (_) {}
         emit(Authenticated(user: user));
       } else {
+        RoleGuard.currentUser = null;
         emit(Unauthenticated());
       }
     } catch (_) {
+      RoleGuard.currentUser = null;
       emit(Unauthenticated());
     }
   }
@@ -131,6 +135,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.rememberMe,
       );
       final user = await _authRepository.getProfile();
+      RoleGuard.currentUser = user;
       try {
         await SyncManager().performStartupSync();
         SyncManager().isSyncCompleted = true;
@@ -145,6 +150,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
       emit(Authenticated(user: user));
     } catch (e) {
+      RoleGuard.currentUser = null;
       emit(AuthError(message: e.toString()));
       emit(Unauthenticated());
     }
@@ -158,6 +164,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _authRepository.logout();
     } catch (_) {}
+    RoleGuard.currentUser = null;
     emit(Unauthenticated());
   }
 
@@ -168,6 +175,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await SessionCleanup.clearLocalSession(clearToken: true);
     } catch (_) {}
+    RoleGuard.currentUser = null;
     emit(Unauthenticated());
   }
 }
