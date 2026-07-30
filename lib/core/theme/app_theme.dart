@@ -164,6 +164,8 @@ class PremiumTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final FormFieldValidator<String>? validator;
   final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
 
   const PremiumTextField({
     super.key,
@@ -175,6 +177,8 @@ class PremiumTextField extends StatelessWidget {
     this.suffixIcon,
     this.validator,
     this.autofillHints,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -184,6 +188,8 @@ class PremiumTextField extends StatelessWidget {
       keyboardType: keyboardType,
       obscureText: obscureText,
       autofillHints: autofillHints,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
       style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
       decoration: InputDecoration(
         labelText: labelText,

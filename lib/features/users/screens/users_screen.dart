@@ -743,31 +743,39 @@ class _UsersScreenState extends State<UsersScreen> {
                 roles = state.roles;
               }
 
+              final authState = context.watch<AuthBloc>().state;
+              String? userRole;
+              if (authState is Authenticated) {
+                userRole = authState.user.role;
+              }
+              final bool isSuperAdmin = userRole == 'Super Admin';
+
               return Wrap(
                 spacing: CRMSpacing.m,
                 runSpacing: CRMSpacing.s,
                 children: [
                   // Role Filter
-                  _buildDropdown(
-                    label: 'Filter by Role',
-                    value: _selectedRoleId,
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text("All Roles"),
-                      ),
-                      ...roles.map((r) => DropdownMenuItem<String?>(
-                            value: r.id,
-                            child: Text(r.name),
-                          )),
-                    ],
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedRoleId = val;
-                      });
-                      _triggerFetch();
-                    },
-                  ),
+                  if (isSuperAdmin)
+                    _buildDropdown(
+                      label: 'Filter by Role',
+                      value: _selectedRoleId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text("All Roles"),
+                        ),
+                        ...roles.map((r) => DropdownMenuItem<String?>(
+                              value: r.id,
+                              child: Text(r.name),
+                            )),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedRoleId = val;
+                        });
+                        _triggerFetch();
+                      },
+                    ),
                   
                   // Status Filter
                   _buildDropdown(

@@ -416,6 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icons.mail_outline_rounded,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
+                    textInputAction: TextInputAction.next,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter your email address';
@@ -435,6 +436,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icons.lock_outline_rounded,
                     obscureText: _obscurePassword,
                     autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
                     suffixIcon: Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: IconButton(

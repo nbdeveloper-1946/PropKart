@@ -325,15 +325,14 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
       final maintenanceStr = (maintenanceVal != null && maintenanceVal > 0) ? CRMCurrencyFormatter.format(maintenanceVal) : "₹0";
       basicItems.add(_DetailItem('Maintenance', '$maintenanceStr/mo', Icons.build_circle_outlined));
       
-      final isVerified = p['is_verified'] == true;
-      basicItems.add(_DetailItem('Verification', isVerified ? 'Verified' : 'Pending Verification', Icons.verified_outlined));
+
 
       // 2. Specifications & Floor Details Items
       final List<_DetailItem> specsItems = [];
       
       final bedroomsVal = p['bedrooms'] != null ? int.tryParse(p['bedrooms'].toString()) : 0;
       if (bedroomsVal != null && bedroomsVal > 0) {
-        specsItems.add(_DetailItem('Bedrooms', '$bedroomsVal BHK', Icons.king_bed_outlined));
+        specsItems.add(_DetailItem('Bedrooms', '$bedroomsVal', Icons.king_bed_outlined));
       }
       
       final bathroomsVal = p['bathrooms'] != null ? int.tryParse(p['bathrooms'].toString()) : 0;
@@ -544,7 +543,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildDetailColumn(Icons.bed_rounded, "Bedrooms", "${p['bedrooms'] ?? '-'} BHK"),
+                  _buildDetailColumn(Icons.bed_rounded, "Bedrooms", "${p['bedrooms'] ?? '-'}"),
                   _buildDetailColumn(Icons.square_foot_rounded, "Area", p['super_builtup_area'] != null ? "${p['super_builtup_area']} sqft" : "-"),
                   _buildDetailColumn(Icons.event_available_rounded, "Available From", availableDisplay),
                 ],

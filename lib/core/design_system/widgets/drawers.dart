@@ -91,7 +91,7 @@ class BuildPropertyDetailWidget extends StatelessWidget {
     if (property.maintenance > 0) {
       basicItems.add(PropertyDetailItem('Maintenance', '₹${BudgetFormatter.format(property.maintenance)}/mo', Icons.build_circle_outlined));
     }
-    basicItems.add(PropertyDetailItem('Verification', property.isVerified ? 'Verified' : 'Pending Verification', Icons.verified_outlined));
+
     if (isUserAdminOrSuperAdmin && _isValidValue(property.createdByName)) {
       final showCreator = currentUser?.role == 'Super Admin' ||
           (currentUser?.role == 'Admin' && (property.createdBy == currentUser?.id || property.adminId == currentUser?.id));
@@ -103,7 +103,7 @@ class BuildPropertyDetailWidget extends StatelessWidget {
 
     final List<PropertyDetailItem> specsItems = [];
     if (property.bedrooms > 0) {
-      specsItems.add(PropertyDetailItem('Bedrooms', '${property.bedrooms} BHK', Icons.king_bed_outlined));
+      specsItems.add(PropertyDetailItem('Bedrooms', '${property.bedrooms}', Icons.king_bed_outlined));
     }
     if (property.bathrooms > 0) {
       specsItems.add(PropertyDetailItem('Bathrooms', '${property.bathrooms}', Icons.bathtub_outlined));

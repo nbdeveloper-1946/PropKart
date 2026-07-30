@@ -291,7 +291,7 @@ class _SharePropertiesPageState extends State<SharePropertiesPage> {
     final imageUrls = p['images'] as List<dynamic>? ?? [];
     final hasImage = imageUrls.isNotEmpty;
     final areaSqft = p['super_builtup_area'] != null ? '${p['super_builtup_area']} sqft' : '';
-    final bedrooms = p['bedrooms'] != null ? '${p['bedrooms']} BHK' : '';
+    final bedrooms = p['bedrooms'] != null ? '${p['bedrooms']}' : '';
 
     return Container(
       decoration: BoxDecoration(

@@ -285,6 +285,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
     _showSearchOverlay();
     try {
       final queryLower = query.toLowerCase();
+      final queryNormalized = queryLower.replaceAll(' ', '');
 
       final authState = context.read<AuthBloc>().state;
       String? currentUserRole;
@@ -302,6 +303,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
         final ownerMobile = (p.ownerMobile ?? '').toLowerCase();
         final area = (p.areaName ?? '').toLowerCase();
         final bhk = (p.configurationName ?? '').toLowerCase();
+        final bhkNormalized = bhk.replaceAll(' ', '');
         final date = p.createdAt.toString().toLowerCase();
         final status = (p.propertyStatusName ?? '').toLowerCase();
         final superBuiltup = (p.superBuiltupArea?.toString() ?? '').toLowerCase();
@@ -317,6 +319,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
             ownerMobile.contains(queryLower) ||
             area.contains(queryLower) ||
             bhk.contains(queryLower) ||
+            (bhkNormalized.isNotEmpty && bhkNormalized.contains(queryNormalized)) ||
             date.contains(queryLower) ||
             status.contains(queryLower) ||
             superBuiltup.contains(queryLower) ||
@@ -351,6 +354,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
           final ownerMobile = (p.ownerMobile ?? '').toLowerCase();
           final area = (p.areaName ?? '').toLowerCase();
           final bhk = (p.configurationName ?? '').toLowerCase();
+          final bhkNormalized = bhk.replaceAll(' ', '');
           final date = p.createdAt.toString().toLowerCase();
           final status = (p.propertyStatusName ?? '').toLowerCase();
           final superBuiltup = (p.superBuiltupArea?.toString() ?? '').toLowerCase();
@@ -366,6 +370,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
               ownerMobile.contains(queryLower) ||
               area.contains(queryLower) ||
               bhk.contains(queryLower) ||
+              (bhkNormalized.isNotEmpty && bhkNormalized.contains(queryNormalized)) ||
               date.contains(queryLower) ||
               status.contains(queryLower) ||
               superBuiltup.contains(queryLower) ||
@@ -398,6 +403,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
         final remarks = (r.remarks ?? '').toLowerCase();
         final type = (r.propertyTypeName ?? '').toLowerCase();
         final config = (r.configurationName ?? '').toLowerCase();
+        final configNormalized = config.replaceAll(' ', '');
         final category = (r.categoryName ?? '').toLowerCase();
         final matchesArea = r.areaNames.any((name) => name.toLowerCase().contains(queryLower));
         final salesmanCreator = (r.creatorName ?? '').toLowerCase();
@@ -408,6 +414,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
             remarks.contains(queryLower) ||
             type.contains(queryLower) ||
             config.contains(queryLower) ||
+            (configNormalized.isNotEmpty && configNormalized.contains(queryNormalized)) ||
             category.contains(queryLower) ||
             matchesArea;
 
