@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,6 +21,7 @@ import '../bloc/dashboard_bloc.dart';
 import '../models/dashboard_summary.dart';
 import '../../../core/api/dio_client.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/storage/repository_coordinator.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -48,6 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Map<String, bool> _optimisticChecklistStates = {};
   final List<ChecklistItem> _optimisticAddedChecklistItems = [];
   final Set<String> _optimisticDeletedChecklistIds = {};
+  bool _isChecklistLoading = false;
 
   @override
   void initState() {
@@ -262,7 +265,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         value: '$availableVal',
         icon: Icons.check_circle_outline_rounded,
         iconColor: CRMColors.success,
-        growthPercent: summary.availableTrend,
       ),
       if (_activeTab == 'Re-Sale')
         CRMKPICard(
@@ -270,7 +272,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           value: '$soldVal',
           icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.warning,
-          growthPercent: summary.soldTrend,
         ),
       if (_activeTab == 'Rental')
         CRMKPICard(
@@ -278,20 +279,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           value: '$rentedVal',
           icon: Icons.directions_walk_rounded,
           iconColor: CRMColors.info,
-          growthPercent: summary.rentedTrend,
         ),
       CRMKPICard(
         title: 'Requirements',
         value: '$requirementsVal',
         icon: Icons.assignment_turned_in_outlined,
-        growthPercent: summary.requirementsTrend,
       ),
       CRMKPICard(
         title: 'My Won',
         value: '${_activeTab == 'Rental' ? summary.rentalWonRequirements : summary.resaleWonRequirements}',
         icon: Icons.emoji_events_outlined,
         iconColor: CRMColors.success,
-        growthPercent: 0.0,
       ),
     ];
 
@@ -901,10 +899,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
       elevated: true,
       title: "Note's",
       subtitle: 'Operations and tasks assigned for today',
-      headerAction: IconButton(
-        icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primary, size: 20),
-        onPressed: _showAddChecklistDialog,
-        tooltip: 'Add Task',
+      headerAction: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isChecklistLoading)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(CRMColors.primary),
+                ),
+              ),
+            ),
+          IconButton(
+            icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primary, size: 20),
+            onPressed: _isChecklistLoading ? null : _showAddChecklistDialog,
+            tooltip: 'Add Task',
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: CRMSpacing.m),
@@ -959,6 +974,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _updateLocalChecklistState(String itemId, bool isCompleted) async {
+    try {
+      final coordinator = RepositoryCoordinator();
+      final localDashboard = await coordinator.dashboardLocal.getDashboard();
+      if (localDashboard != null) {
+        final List<dynamic> list = jsonDecode(localDashboard.checklistJson);
+        bool found = false;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i]['id'] == itemId) {
+            list[i]['is_completed'] = isCompleted;
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          localDashboard.checklistJson = jsonEncode(list);
+          await coordinator.dashboardLocal.saveDashboard(localDashboard);
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to update local checklist state: $e");
+    }
+  }
+
+  Future<void> _deleteLocalChecklistItem(String itemId) async {
+    try {
+      final coordinator = RepositoryCoordinator();
+      final localDashboard = await coordinator.dashboardLocal.getDashboard();
+      if (localDashboard != null) {
+        final List<dynamic> list = jsonDecode(localDashboard.checklistJson);
+        final initialLength = list.length;
+        list.removeWhere((item) => item['id'] == itemId);
+        if (list.length != initialLength) {
+          localDashboard.checklistJson = jsonEncode(list);
+          await coordinator.dashboardLocal.saveDashboard(localDashboard);
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to delete local checklist item: $e");
+    }
+  }
+
   Widget _buildTaskTile(ChecklistItem item) {
     final bool isCompleted = _optimisticChecklistStates.containsKey(item.id)
         ? _optimisticChecklistStates[item.id]!
@@ -977,27 +1034,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Checkbox(
             value: isCompleted,
             activeColor: CRMColors.success,
-            onChanged: (val) async {
-              if (val != null) {
-                setState(() {
-                  _optimisticChecklistStates[item.id] = val;
-                });
-                if (!item.id.startsWith('temp_')) {
-                  try {
-                    await DioClient.dio.patch('/checklist/${item.id}/toggle', data: {'is_completed': val});
-                    if (mounted) {
-                      context.read<DashboardBloc>().add(RefreshDashboard());
-                    }
-                  } catch (_) {
-                    if (mounted) {
+            onChanged: _isChecklistLoading
+                ? null
+                : (val) async {
+                    if (val != null) {
                       setState(() {
-                        _optimisticChecklistStates.remove(item.id);
+                        _optimisticChecklistStates[item.id] = val;
+                        _isChecklistLoading = true;
                       });
+                      if (!item.id.startsWith('temp_')) {
+                        try {
+                          await _updateLocalChecklistState(item.id, val);
+                          await DioClient.dio.patch('/checklist/${item.id}/toggle', data: {'is_completed': val});
+                          if (mounted) {
+                            context.read<DashboardBloc>().add(RefreshDashboard());
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            setState(() {
+                              _optimisticChecklistStates.remove(item.id);
+                            });
+                            await _updateLocalChecklistState(item.id, !val);
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              _isChecklistLoading = false;
+                            });
+                          }
+                        }
+                      } else {
+                        setState(() {
+                          _isChecklistLoading = false;
+                        });
+                      }
                     }
-                  }
-                }
-              }
-            },
+                  },
           ),
           const SizedBox(width: CRMSpacing.s),
           Expanded(
@@ -1011,28 +1083,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline_rounded, color: CRMColors.danger, size: 18),
-            onPressed: () async {
-              final itemId = item.id;
-              setState(() {
-                _optimisticDeletedChecklistIds.add(itemId);
-                _optimisticAddedChecklistItems.removeWhere((x) => x.id == itemId);
-              });
-              if (!itemId.startsWith('temp_')) {
-                try {
-                  await DioClient.dio.delete('/checklist/$itemId');
-                  if (mounted) {
-                    context.read<DashboardBloc>().add(RefreshDashboard());
-                  }
-                } catch (_) {
-                  if (mounted) {
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              color: _isChecklistLoading ? CRMColors.textSecondaryOf(context) : CRMColors.danger,
+              size: 18,
+            ),
+            onPressed: _isChecklistLoading
+                ? null
+                : () async {
+                    final itemId = item.id;
                     setState(() {
-                      _optimisticDeletedChecklistIds.remove(itemId);
+                      _optimisticDeletedChecklistIds.add(itemId);
+                      _optimisticAddedChecklistItems.removeWhere((x) => x.id == itemId);
+                      _isChecklistLoading = true;
                     });
-                  }
-                }
-              }
-            },
+                    if (!itemId.startsWith('temp_')) {
+                      try {
+                        await _deleteLocalChecklistItem(itemId);
+                        await DioClient.dio.delete('/checklist/$itemId');
+                        if (mounted) {
+                          context.read<DashboardBloc>().add(RefreshDashboard());
+                        }
+                      } catch (_) {
+                        if (mounted) {
+                          setState(() {
+                            _optimisticDeletedChecklistIds.remove(itemId);
+                          });
+                          context.read<DashboardBloc>().add(RefreshDashboard());
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _isChecklistLoading = false;
+                          });
+                        }
+                      }
+                    } else {
+                      setState(() {
+                        _isChecklistLoading = false;
+                      });
+                    }
+                  },
           ),
         ],
       ),
@@ -1064,7 +1155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             CRMButton(
               label: 'Save',
-              onPressed: () {
+              onPressed: () async {
                 final title = controller.text.trim();
                 if (title.isNotEmpty) {
                   final tempItem = ChecklistItem(
@@ -1075,19 +1166,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                   setState(() {
                     _optimisticAddedChecklistItems.add(tempItem);
+                    _isChecklistLoading = true;
                   });
                   Navigator.pop(ctx);
-                  DioClient.dio.post('/checklist', data: {'title': title}).then((_) {
+                  try {
+                    await DioClient.dio.post('/checklist', data: {'title': title});
                     if (mounted) {
                       context.read<DashboardBloc>().add(RefreshDashboard());
                     }
-                  }).catchError((_) {
+                  } catch (_) {
                     if (mounted) {
                       setState(() {
                         _optimisticAddedChecklistItems.removeWhere((x) => x.id == tempItem.id);
                       });
                     }
-                  });
+                  } finally {
+                    if (mounted) {
+                      setState(() {
+                        _isChecklistLoading = false;
+                      });
+                    }
+                  }
                 } else {
                   Navigator.pop(ctx);
                 }

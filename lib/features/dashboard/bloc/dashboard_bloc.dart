@@ -83,12 +83,21 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     LoadDashboard event,
     Emitter<DashboardState> emit,
   ) async {
-    emit(DashboardLoading());
+    final currentState = state;
+    if (currentState is! DashboardLoadedState && currentState is! DashboardRefreshing) {
+      emit(DashboardLoading());
+    }
     try {
       final data = await _dashboardRepository.getDashboardData();
       emit(DashboardLoadedState(data: data));
     } catch (e) {
-      emit(DashboardError(message: e.toString()));
+      if (currentState is DashboardLoadedState) {
+        emit(DashboardLoadedState(data: currentState.data));
+      } else if (currentState is DashboardRefreshing) {
+        emit(DashboardLoadedState(data: currentState.data));
+      } else {
+        emit(DashboardError(message: e.toString()));
+      }
     }
   }
 
