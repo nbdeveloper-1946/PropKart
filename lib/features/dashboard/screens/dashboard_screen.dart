@@ -1131,6 +1131,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _showAddChecklistDialog() {
     final controller = TextEditingController();
+
+    Future<void> saveTask(String text, BuildContext dialogCtx) async {
+      final title = text.trim();
+      if (title.isNotEmpty) {
+        final tempItem = ChecklistItem(
+          id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+          title: title,
+          isCompleted: false,
+          dueDate: '',
+        );
+        setState(() {
+          _optimisticAddedChecklistItems.add(tempItem);
+          _isChecklistLoading = true;
+        });
+        Navigator.pop(dialogCtx);
+        try {
+          await DioClient.dio.post('/checklist', data: {'title': title});
+          if (mounted) {
+            context.read<DashboardBloc>().add(RefreshDashboard());
+          }
+        } catch (_) {
+          if (mounted) {
+            setState(() {
+              _optimisticAddedChecklistItems.removeWhere((x) => x.id == tempItem.id);
+            });
+          }
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isChecklistLoading = false;
+            });
+          }
+        }
+      } else {
+        Navigator.pop(dialogCtx);
+      }
+    }
+
     showDialog(
       context: context,
       builder: (ctx) {
@@ -1139,6 +1177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           title: Text('Add New Task', style: CRMTypography.sectionTitle.copyWith(color: CRMColors.textOf(context))),
           content: TextField(
             controller: controller,
+            textInputAction: TextInputAction.done,
             decoration: InputDecoration(
               hintText: 'Task Title',
               filled: true,
@@ -1146,6 +1185,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
             ),
             autofocus: true,
+            onSubmitted: (val) => saveTask(val, ctx),
           ),
           actions: [
             TextButton(
@@ -1154,42 +1194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             CRMButton(
               label: 'Save',
-              onPressed: () async {
-                final title = controller.text.trim();
-                if (title.isNotEmpty) {
-                  final tempItem = ChecklistItem(
-                    id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-                    title: title,
-                    isCompleted: false,
-                    dueDate: '',
-                  );
-                  setState(() {
-                    _optimisticAddedChecklistItems.add(tempItem);
-                    _isChecklistLoading = true;
-                  });
-                  Navigator.pop(ctx);
-                  try {
-                    await DioClient.dio.post('/checklist', data: {'title': title});
-                    if (mounted) {
-                      context.read<DashboardBloc>().add(RefreshDashboard());
-                    }
-                  } catch (_) {
-                    if (mounted) {
-                      setState(() {
-                        _optimisticAddedChecklistItems.removeWhere((x) => x.id == tempItem.id);
-                      });
-                    }
-                  } finally {
-                    if (mounted) {
-                      setState(() {
-                        _isChecklistLoading = false;
-                      });
-                    }
-                  }
-                } else {
-                  Navigator.pop(ctx);
-                }
-              },
+              onPressed: () => saveTask(controller.text, ctx),
             ),
           ],
         );

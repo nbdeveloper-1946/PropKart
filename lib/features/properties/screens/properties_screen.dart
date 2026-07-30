@@ -55,6 +55,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   double? _maxPrice;
   int _currentPage = 0;
   int _pageSize = 10;
+  bool _myAddedOnly = false;
+  String _selectedStatusFilter = 'Available';
 
   static const _pageSizeOptions = [10, 25, 50];
 
@@ -460,12 +462,17 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                      p.createdByName.toLowerCase().contains(query));
               }
 
+              final matchesMyAdded = !_myAddedOnly || (p.createdBy == currentUserId);
+              final matchesStatus = (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter.toLowerCase();
+
               return matchesListing &&
                   matchesCategory &&
                   matchesConfig &&
                   matchesArea &&
                   matchesSearch &&
-                  matchesPrice;
+                  matchesPrice &&
+                  matchesMyAdded &&
+                  matchesStatus;
             }).toList();
 
             // Default sorting: Newest first (latest property appears first)
@@ -542,27 +549,30 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                 const SizedBox(height: CRMSpacing.m),
 
                 // Rent vs Re-Sale Toggle Tabs
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    height: 44,
-                    width: 240,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: CRMColors.backgroundOf(context),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
+                Row(
+                  children: [
+                    Container(
+                      height: 44,
+                      width: 240,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: CRMColors.backgroundOf(context),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                              child: _buildPropertyListingTabButton('Rent')),
+                          const SizedBox(width: 4),
+                          Expanded(
+                              child: _buildPropertyListingTabButton('Re-Sale')),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                            child: _buildPropertyListingTabButton('Rent')),
-                        const SizedBox(width: 4),
-                        Expanded(
-                            child: _buildPropertyListingTabButton('Re-Sale')),
-                      ],
-                    ),
-                  ),
+                    const SizedBox(width: CRMSpacing.m),
+                    _buildMyAddedToggle(),
+                  ],
                 ),
                 const SizedBox(height: CRMSpacing.l),
 
@@ -1021,7 +1031,20 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   }
 
   Widget _buildStatisticsRow(List<PropertyModel> properties) {
-    final filteredByListingTab = properties.where((p) {
+    final filteredByMyAdded = properties.where((p) {
+      if (!_myAddedOnly) return true;
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        return p.createdBy == authState.user.id;
+      }
+      return false;
+    }).toList();
+
+    final filteredByStatus = filteredByMyAdded.where((p) {
+      return (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter.toLowerCase();
+    }).toList();
+
+    final filteredByListingTab = filteredByStatus.where((p) {
       final ltName = p.listingTypeName.toLowerCase();
       if (_activeListingTab == 'Rent') {
         return ltName.contains('rent');
@@ -1077,23 +1100,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     final List<Widget> widgets = [];
 
     if (_activeCategoryTab == 'Residential') {
-      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
-      final toBeActive = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'To Be Available').length;
+      final statusCount = filteredByListingAndCategory.length;
       
-      final activeSectors = <ChartSector>[];
-      if (active > 0) {
-        activeSectors.add(ChartSector(label: 'Available', value: active.toDouble(), color: CRMColors.success));
-      }
-      if (toBeActive > 0) {
-        activeSectors.add(ChartSector(label: 'To Be Available', value: toBeActive.toDouble(), color: CRMColors.warning));
-      }
-
       widgets.add(SizedBox(
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Active listings',
-          value: '$active',
+          title: '$_selectedStatusFilter listings',
+          value: '$statusCount',
           icon: Icons.bolt_rounded,
           iconColor: CRMColors.primaryOf(context),
         ),
@@ -1132,14 +1146,14 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ),
       ));
     } else if (_activeCategoryTab == 'Commercial') {
-      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final statusCount = filteredByListingAndCategory.length;
       
       widgets.add(SizedBox(
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Commercial Listings',
-          value: '$active',
+          title: 'Commercial ($_selectedStatusFilter)',
+          value: '$statusCount',
           icon: Icons.business_center_outlined,
           iconColor: CRMColors.primaryOf(context),
         ),
@@ -1181,11 +1195,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ),
       ));
     } else if (_activeCategoryTab == 'Industrial') {
-      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final statusCount = filteredByListingAndCategory.length;
       final warehouses = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('warehouse') || p.title.toLowerCase().contains('warehouse') || (p.description != null && p.description!.toLowerCase().contains('warehouse'))).toList();
       final factories = filteredByListingAndCategory.where((p) => p.categoryName.toLowerCase().contains('factory') || p.categoryName.toLowerCase().contains('industrial') || p.title.toLowerCase().contains('factory') || (p.description != null && p.description!.toLowerCase().contains('factory'))).toList();
       
-      final otherCount = active - (warehouses.where((p) => p.propertyStatusName == 'Available').length + factories.where((p) => p.propertyStatusName == 'Available').length);
+      final otherCount = statusCount - (warehouses.length + factories.length);
 
       final indSectors = <ChartSector>[];
       if (warehouses.isNotEmpty) {
@@ -1202,8 +1216,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Industrial Listings',
-          value: '$active',
+          title: 'Industrial ($_selectedStatusFilter)',
+          value: '$statusCount',
           icon: Icons.factory_outlined,
           iconColor: CRMColors.primaryOf(context),
         ),
@@ -1218,10 +1232,10 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ),
       ));
     } else if (_activeCategoryTab == 'Land & Plot') {
-      final active = filteredByListingAndCategory.where((p) => p.propertyStatusName == 'Available').length;
+      final statusCount = filteredByListingAndCategory.length;
       final resPlots = filteredByListingAndCategory.where((p) => p.title.toLowerCase().contains('resident') || (p.description != null && p.description!.toLowerCase().contains('resident'))).toList();
       final comLand = filteredByListingAndCategory.where((p) => p.title.toLowerCase().contains('commercial') || (p.description != null && p.description!.toLowerCase().contains('commercial'))).toList();
-      final otherLand = active - (resPlots.where((p) => p.propertyStatusName == 'Available').length + comLand.where((p) => p.propertyStatusName == 'Available').length);
+      final otherLand = statusCount - (resPlots.length + comLand.length);
 
       final landSectors = <ChartSector>[];
       if (resPlots.isNotEmpty) {
@@ -1238,8 +1252,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Land & Plots',
-          value: '$active',
+          title: 'Land & Plots ($_selectedStatusFilter)',
+          value: '$statusCount',
           icon: Icons.landscape_outlined,
           iconColor: CRMColors.primaryOf(context),
         ),
@@ -1347,7 +1361,13 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     children: [
                       searchField,
                       const SizedBox(height: CRMSpacing.s),
-                      searchButton,
+                      Row(
+                        children: [
+                          Expanded(child: searchButton),
+                          const SizedBox(width: CRMSpacing.s),
+                          _buildStatusDropdown(),
+                        ],
+                      ),
                     ],
                   );
                 }
@@ -1357,6 +1377,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     Expanded(child: searchField),
                     const SizedBox(width: CRMSpacing.s),
                     searchButton,
+                    const SizedBox(width: CRMSpacing.s),
+                    _buildStatusDropdown(),
                   ],
                 );
               },
@@ -1700,6 +1722,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         setState(() {
           _activeListingTab = label;
           _currentPage = 0;
+          _selectedStatusFilter = 'Available';
         });
       },
       child: AnimatedContainer(
@@ -1722,6 +1745,88 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     );
   }
 
+  Widget _buildMyAddedToggle() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _myAddedOnly = !_myAddedOnly;
+        });
+      },
+      child: AnimatedContainer(
+        duration: CRMMotion.fast,
+        curve: CRMMotion.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m, vertical: 10),
+        decoration: BoxDecoration(
+          color: _myAddedOnly ? const Color(0xFF64826F) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: _myAddedOnly ? const Color(0xFF64826F) : CRMColors.borderOf(context).withOpacity(0.6),
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _myAddedOnly ? Icons.check_circle_rounded : Icons.person_outline_rounded,
+              size: 16,
+              color: _myAddedOnly ? Colors.white : CRMColors.textSecondaryOf(context),
+            ),
+            const SizedBox(width: CRMSpacing.xs),
+            Text(
+              "My Added",
+              style: CRMTypography.bodyMedium.copyWith(
+                color: _myAddedOnly ? Colors.white : CRMColors.textSecondaryOf(context),
+                fontWeight: _myAddedOnly ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    final isRent = _activeListingTab == 'Rent';
+    final items = isRent
+        ? ['Available', 'Rented Out', 'To Be Available']
+        : ['Available', 'Sold Out'];
+
+    return Container(
+      width: 180,
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.m),
+      decoration: BoxDecoration(
+        color: CRMColors.backgroundOf(context),
+        borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+        border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedStatusFilter,
+          items: items.map((String val) {
+            return DropdownMenuItem<String>(
+              value: val,
+              child: Text(
+                val,
+                style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
+              ),
+            );
+          }).toList(),
+          onChanged: (String? newVal) {
+            if (newVal != null) {
+              setState(() {
+                _selectedStatusFilter = newVal;
+              });
+            }
+          },
+          icon: Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context)),
+          dropdownColor: CRMColors.cardBgOf(context),
+        ),
+      ),
+    );
+  }
+
   void _clearFilters() {
     setState(() {
       _searchController.clear();
@@ -1735,6 +1840,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       _minPrice = null;
       _maxPrice = null;
       _currentPage = 0;
+      _myAddedOnly = false;
+      _selectedStatusFilter = 'Available';
     });
     _loadProperties();
   }

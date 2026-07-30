@@ -287,10 +287,10 @@ class _CRMAppShellState extends State<CRMAppShell> {
       // 1. Properties
       final props = await RepositoryCoordinator().propertyLocal.getProperties();
       final matchedProps = props.where((p) =>
-        p.title.toLowerCase().contains(queryLower) ||
-        p.propertyCode.toLowerCase().contains(queryLower) ||
-        p.ownerName.toLowerCase().contains(queryLower) ||
-        p.ownerMobile.contains(queryLower) ||
+        (p.title ?? '').toLowerCase().contains(queryLower) ||
+        (p.propertyCode ?? '').toLowerCase().contains(queryLower) ||
+        (p.ownerName ?? '').toLowerCase().contains(queryLower) ||
+        (p.ownerMobile ?? '').contains(queryLower) ||
         (p.description?.toLowerCase().contains(queryLower) ?? false)
       ).map((p) => {
         'id': p.id,
@@ -302,8 +302,8 @@ class _CRMAppShellState extends State<CRMAppShell> {
       // 2. Requirements
       final reqs = await RepositoryCoordinator().requirementLocal.getRequirements();
       final matchedReqs = reqs.where((r) =>
-        r.clientName.toLowerCase().contains(queryLower) ||
-        r.clientMobile.contains(queryLower) ||
+        (r.clientName ?? '').toLowerCase().contains(queryLower) ||
+        (r.clientMobile ?? '').contains(queryLower) ||
         (r.remarks?.toLowerCase().contains(queryLower) ?? false)
       ).map((r) => {
         'id': r.id,
@@ -314,8 +314,8 @@ class _CRMAppShellState extends State<CRMAppShell> {
       // 3. Owners
       final owners = await RepositoryCoordinator().ownerLocal.getOwners();
       final matchedOwners = owners.where((o) =>
-        o.name.toLowerCase().contains(queryLower) ||
-        o.mobile.contains(queryLower) ||
+        (o.name ?? '').toLowerCase().contains(queryLower) ||
+        (o.mobile ?? '').contains(queryLower) ||
         (o.email?.toLowerCase().contains(queryLower) ?? false)
       ).map((o) => {
         'id': o.id,
@@ -326,10 +326,10 @@ class _CRMAppShellState extends State<CRMAppShell> {
       // 4. Builders
       final builders = await RepositoryCoordinator().builderLocal.getBuilders();
       final matchedBuilders = builders.where((b) =>
-        b.companyName.toLowerCase().contains(queryLower) ||
-        b.contactPerson.toLowerCase().contains(queryLower) ||
-        b.mobile.contains(queryLower) ||
-        b.email.toLowerCase().contains(queryLower) ||
+        (b.companyName ?? '').toLowerCase().contains(queryLower) ||
+        (b.contactPerson ?? '').toLowerCase().contains(queryLower) ||
+        (b.mobile ?? '').contains(queryLower) ||
+        (b.email ?? '').toLowerCase().contains(queryLower) ||
         (b.remarks?.toLowerCase().contains(queryLower) ?? false)
       ).map((b) => {
         'id': b.id,
@@ -341,9 +341,9 @@ class _CRMAppShellState extends State<CRMAppShell> {
       // 5. Clients
       final clients = await RepositoryCoordinator().clientLocal.getClients();
       final matchedClients = clients.where((c) =>
-        c.name.toLowerCase().contains(queryLower) ||
-        c.mobile.contains(queryLower) ||
-        c.email.toLowerCase().contains(queryLower) ||
+        (c.name ?? '').toLowerCase().contains(queryLower) ||
+        (c.mobile ?? '').contains(queryLower) ||
+        (c.email ?? '').toLowerCase().contains(queryLower) ||
         (c.remarks?.toLowerCase().contains(queryLower) ?? false)
       ).map((c) => {
         'id': c.id,
@@ -423,7 +423,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
                                       subtitle: 'Code: ${p['property_code']} • ₹${BudgetFormatter.format((p['price'] as num?)?.toDouble() ?? 0.0)}',
                                       onTap: () {
                                         _hideSearchOverlay();
-                                        context.go('/properties');
+                                        context.go('/properties?openId=${p['id']}');
                                       },
                                     )),
                               ],
@@ -459,7 +459,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
                                       subtitle: 'Contact: ${b['contact_person']} • Mobile: ${b['mobile']}',
                                       onTap: () {
                                         _hideSearchOverlay();
-                                        context.go('/employees');
+                                        context.go('/builders');
                                       },
                                     )),
                               ],
@@ -471,7 +471,7 @@ class _CRMAppShellState extends State<CRMAppShell> {
                                       subtitle: 'Mobile: ${c['mobile']}',
                                       onTap: () {
                                         _hideSearchOverlay();
-                                        context.go('/requirements');
+                                        context.go('/clients');
                                       },
                                     )),
                               ],
