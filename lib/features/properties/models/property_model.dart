@@ -62,6 +62,7 @@ class PropertyModel {
   final List<String> images;
   final List<String> amenities;
   final List<String> videos;
+  final Map<String, dynamic>? additionalDetails;
 
   PropertyModel({
     required this.id,
@@ -125,6 +126,7 @@ class PropertyModel {
     this.brokerageTypeName,
     this.adminId,
     this.organizationId,
+    this.additionalDetails,
   });
 
   factory PropertyModel.fromJson(Map<String, dynamic> json) {
@@ -249,6 +251,7 @@ class PropertyModel {
       videos: videoList,
       adminId: json['admin_id'] as String?,
       organizationId: json['organization_id'] as String?,
+      additionalDetails: json['additional_details'] as Map<String, dynamic>?,
     );
   }
 
@@ -293,6 +296,7 @@ class PropertyModel {
       'amenities': amenities,
       'images': images,
       'videos': videos,
+      'additional_details': additionalDetails,
     };
   }
 

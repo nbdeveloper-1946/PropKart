@@ -2213,6 +2213,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               metadata: metadata,
               property: property,
               activeTab: _activeTab,
+              activeListingTab: _activeListingTab,
             ),
           ),
         ),

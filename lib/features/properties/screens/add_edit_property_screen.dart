@@ -18,12 +18,14 @@ class AddEditPropertyScreen extends StatefulWidget {
   final PropertyMetadataModel metadata;
   final PropertyModel? property;
   final String activeTab;
+  final String? activeListingTab;
 
   const AddEditPropertyScreen({
     super.key,
     required this.metadata,
     this.property,
     required this.activeTab,
+    this.activeListingTab,
   });
 
   @override
@@ -61,6 +63,8 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
   
   final List<String> _propertyImages = [];
   final List<String> _propertyVideos = [];
+  Map<String, dynamic> _additionalDetails = {};
+  final Map<String, TextEditingController> _customControllers = {};
 
   String? _selectedCategory;
   String? _selectedType;
@@ -134,6 +138,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
     _blockWingController.dispose();
     _flatNoController.dispose();
     _facingController.dispose();
+    _customControllers.forEach((_, c) => c.dispose());
     if (!_isSaved && widget.property == null) {
       _saveCurrentDraft();
     }
@@ -194,10 +199,34 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
     _cities = List.from(widget.metadata.cities);
     _areas = List.from(widget.metadata.areas);
     _localAmenities = List.from(widget.metadata.amenities);
+    _additionalDetails = widget.property?.additionalDetails != null
+        ? Map<String, dynamic>.from(widget.property!.additionalDetails!)
+        : {};
+    _customControllers.clear();
+    _additionalDetails.forEach((key, val) {
+      _customControllers[key] = TextEditingController(text: val?.toString() ?? '');
+    });
 
     if (widget.metadata.categories.isNotEmpty) _selectedCategory = widget.metadata.categories.first.id;
     if (widget.metadata.types.isNotEmpty) _selectedType = widget.metadata.types.first.id;
-    if (widget.metadata.listingTypes.isNotEmpty) _selectedListingType = widget.metadata.listingTypes.first.id;
+    if (widget.metadata.listingTypes.isNotEmpty) {
+      if (widget.property == null && widget.activeListingTab != null) {
+        final match = widget.metadata.listingTypes.firstWhere(
+          (l) {
+            final name = l.name.toLowerCase();
+            if (widget.activeListingTab == 'Rent') {
+              return name == 'rent' || l.id == 'rent';
+            } else {
+              return name.contains('sale') || l.id.contains('sale');
+            }
+          },
+          orElse: () => LookupItem(id: '', name: ''),
+        );
+        _selectedListingType = match.id.isNotEmpty ? match.id : widget.metadata.listingTypes.first.id;
+      } else {
+        _selectedListingType = widget.metadata.listingTypes.first.id;
+      }
+    }
     if (widget.metadata.statuses.isNotEmpty) {
       final statuses = widget.metadata.statuses;
       final availIndex = statuses.indexWhere((s) => s.name.trim().toLowerCase() == 'available');
@@ -1068,6 +1097,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         'amenities': _selectedAmenities,
         'images': _propertyImages,
         'videos': _propertyVideos,
+        'additional_details': _additionalDetails,
         'is_verified': _isVerified,
         'possession_date': (toBeAvailableId.isNotEmpty && _selectedStatus == toBeAvailableId)
             ? _availableDate?.toIso8601String().substring(0, 10)
@@ -1306,6 +1336,15 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
   }
 
   Widget _buildBasicStep(bool isMobile) {
+    final selectedCategoryItem = widget.metadata.categories.firstWhere(
+      (c) => c.id == _selectedCategory,
+      orElse: () => LookupItem(id: '', name: ''),
+    );
+    final categoryName = selectedCategoryItem.name.trim().toLowerCase();
+    final isLandOrIndustrial = categoryName.contains('land') || 
+                               categoryName.contains('plot') || 
+                               categoryName.contains('industrial');
+
     final filteredTypes = _getFilteredTypes();
     if (_selectedType != null && !filteredTypes.any((t) => t.id == _selectedType)) {
       _selectedType = filteredTypes.isNotEmpty ? filteredTypes.first.id : null;
@@ -1532,32 +1571,34 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: CRMSpacing.m),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _selectedConfig,
-                    decoration: InputDecoration(
-                      labelText: 'Configuration',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+            if (!isLandOrIndustrial) ...[
+              const SizedBox(height: CRMSpacing.m),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _selectedConfig,
+                      decoration: InputDecoration(
+                        labelText: 'Configuration',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('None')),
+                        ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                      ],
+                      onChanged: _onConfigurationChanged,
                     ),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('None')),
-                      ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-                    ],
-                    onChanged: _onConfigurationChanged,
                   ),
-                ),
-                const SizedBox(width: CRMSpacing.xs),
-                IconButton(
-                  icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primaryOf(context)),
-                  onPressed: () => _showAddMasterDialog('configuration'),
-                  tooltip: 'Add Configuration',
-                ),
-              ],
-            ),
+                  const SizedBox(width: CRMSpacing.xs),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primaryOf(context)),
+                    onPressed: () => _showAddMasterDialog('configuration'),
+                    tooltip: 'Add Configuration',
+                  ),
+                ],
+              ),
+            ],
           ] else ...[
             Row(
               children: [
@@ -1587,31 +1628,33 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                 ),
                 const SizedBox(width: CRMSpacing.s),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: _selectedConfig,
-                          decoration: InputDecoration(
-                            labelText: 'Configuration',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-                          ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('None')),
-                            ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                  child: !isLandOrIndustrial
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                value: _selectedConfig,
+                                decoration: InputDecoration(
+                                  labelText: 'Configuration',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+                                ),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text('None')),
+                                  ...filteredConfigs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                                ],
+                                onChanged: _onConfigurationChanged,
+                              ),
+                            ),
+                            const SizedBox(width: CRMSpacing.xs),
+                            IconButton(
+                              icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primaryOf(context)),
+                              onPressed: () => _showAddMasterDialog('configuration'),
+                              tooltip: 'Add Configuration',
+                            ),
                           ],
-                          onChanged: _onConfigurationChanged,
-                        ),
-                      ),
-                      const SizedBox(width: CRMSpacing.xs),
-                      IconButton(
-                        icon: Icon(Icons.add_circle_outline_rounded, color: CRMColors.primaryOf(context)),
-                        onPressed: () => _showAddMasterDialog('configuration'),
-                        tooltip: 'Add Configuration',
-                      ),
-                    ],
-                  ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -1883,6 +1926,413 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
     );
   }
 
+  Widget _buildCustomTextField({
+    required String label,
+    required String key,
+    bool isNumeric = false,
+    bool isRequired = false,
+  }) {
+    if (!_customControllers.containsKey(key)) {
+      _customControllers[key] = TextEditingController(text: _additionalDetails[key]?.toString() ?? '');
+    }
+    final controller = _customControllers[key]!;
+    return TextFormField(
+      controller: controller,
+      style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
+      keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: '$label${isRequired ? ' *' : ''}',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+      ),
+      validator: (v) {
+        if (isRequired && (v == null || v.trim().isEmpty)) {
+          return '$label is required';
+        }
+        return null;
+      },
+      onChanged: (val) {
+        _additionalDetails[key] = isNumeric ? (double.tryParse(val) ?? val) : val;
+      },
+    );
+  }
+
+  Widget _buildCustomBooleanField({
+    required String label,
+    required String key,
+    bool isRequired = false,
+  }) {
+    final bool value = _additionalDetails[key] == true;
+    return CheckboxListTile(
+      title: Text(label, style: CRMTypography.body.copyWith(color: CRMColors.textOf(context))),
+      value: value,
+      activeColor: CRMColors.primaryOf(context),
+      onChanged: (val) {
+        setState(() {
+          _additionalDetails[key] = val;
+        });
+      },
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildCustomDropdownField({
+    required String label,
+    required String key,
+    required List<String> options,
+    bool isRequired = false,
+  }) {
+    final value = _additionalDetails[key]?.toString();
+    final selectedValue = options.contains(value) ? value : null;
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      value: selectedValue,
+      decoration: InputDecoration(
+        labelText: '$label${isRequired ? ' *' : ''}',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+      ),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('None')),
+        ...options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))),
+      ],
+      validator: (v) {
+        if (isRequired && (v == null || v.isEmpty)) {
+          return '$label is required';
+        }
+        return null;
+      },
+      onChanged: (val) {
+        setState(() {
+          _additionalDetails[key] = val;
+        });
+      },
+    );
+  }
+
+  Widget _buildLandDetailsSection(bool isMobile, bool isLand, bool isIndustrial) {
+    if (!isLand && !isIndustrial) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: CRMSpacing.l),
+        Text('Land Details', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+        const SizedBox(height: CRMSpacing.s),
+        if (isMobile) ...[
+          _buildCustomTextField(label: 'Plot Length (Ft)', key: 'plot_length', isNumeric: true, isRequired: isLand),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Plot Width (Ft)', key: 'plot_width', isNumeric: true, isRequired: isLand),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: true),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: true),
+          const SizedBox(height: CRMSpacing.m),
+          if (isLand) ...[
+            _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: true),
+            const SizedBox(height: CRMSpacing.m),
+          ],
+          _buildCustomBooleanField(label: 'Corner Plot', key: 'corner_plot'),
+          _buildCustomBooleanField(label: 'Boundary Wall', key: 'boundary_wall'),
+          _buildCustomBooleanField(label: 'Gate', key: 'gate'),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(child: _buildCustomTextField(label: 'Plot Length (Ft)', key: 'plot_length', isNumeric: true, isRequired: isLand)),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomTextField(label: 'Plot Width (Ft)', key: 'plot_width', isNumeric: true, isRequired: isLand)),
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              Expanded(child: _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: true)),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: true)),
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              if (isLand) ...[
+                Expanded(child: _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: true)),
+                const SizedBox(width: CRMSpacing.s),
+              ],
+              Expanded(child: _buildCustomBooleanField(label: 'Corner Plot', key: 'corner_plot')),
+              if (!isLand) const Expanded(child: SizedBox()),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Boundary Wall', key: 'boundary_wall')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Gate', key: 'gate')),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLegalDetailsSection(bool isMobile, bool isLand, bool isIndustrial) {
+    if (!isLand && !isIndustrial) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: CRMSpacing.l),
+        Text('Legal Details', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+        const SizedBox(height: CRMSpacing.s),
+        if (isMobile) ...[
+          _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: isLand),
+          const SizedBox(height: CRMSpacing.m),
+          if (isLand) ...[
+            _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: true),
+            const SizedBox(height: CRMSpacing.m),
+            _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: true),
+            const SizedBox(height: CRMSpacing.m),
+            _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: true),
+            const SizedBox(height: CRMSpacing.m),
+          ],
+          _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true),
+          const SizedBox(height: CRMSpacing.m),
+          if (isLand) ...[
+            _buildCustomTextField(label: 'RERA Number', key: 'rera'),
+            const SizedBox(height: CRMSpacing.m),
+          ],
+          _buildCustomBooleanField(label: 'Title Clear', key: 'title_clear'),
+          if (isIndustrial) ...[
+            _buildCustomBooleanField(label: 'Occupancy Certificate (OC)', key: 'occupancy_certificate'),
+            _buildCustomBooleanField(label: 'Fire NOC', key: 'fire_noc'),
+            _buildCustomBooleanField(label: 'Pollution Clearance', key: 'pollution_clearance'),
+            _buildCustomBooleanField(label: 'Factory License', key: 'factory_license'),
+          ],
+        ] else ...[
+          Row(
+            children: [
+              Expanded(child: _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: isLand)),
+              const SizedBox(width: CRMSpacing.s),
+              if (isLand) ...[
+                Expanded(child: _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: true)),
+              ] else ...[
+                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true)),
+              ],
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              if (isLand) ...[
+                Expanded(child: _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: true)),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: true)),
+              ] else ...[
+                Expanded(child: _buildCustomBooleanField(label: 'Title Clear', key: 'title_clear')),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomBooleanField(label: 'Occupancy Certificate (OC)', key: 'occupancy_certificate')),
+              ],
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              if (isLand) ...[
+                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true)),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomTextField(label: 'RERA Number', key: 'rera')),
+              ] else ...[
+                Expanded(child: _buildCustomBooleanField(label: 'Fire NOC', key: 'fire_noc')),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomBooleanField(label: 'Pollution Clearance', key: 'pollution_clearance')),
+              ],
+            ],
+          ),
+          if (isLand) ...[
+            const SizedBox(height: CRMSpacing.m),
+            Row(
+              children: [
+                Expanded(child: _buildCustomBooleanField(label: 'Title Clear', key: 'title_clear')),
+                const SizedBox(width: CRMSpacing.s),
+                const Expanded(child: SizedBox()),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: CRMSpacing.m),
+            Row(
+              children: [
+                Expanded(child: _buildCustomBooleanField(label: 'Factory License', key: 'factory_license')),
+                const SizedBox(width: CRMSpacing.s),
+                const Expanded(child: SizedBox()),
+              ],
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildUtilitiesSection(bool isMobile, bool isLand, bool isIndustrial) {
+    if (!isLand && !isIndustrial) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: CRMSpacing.l),
+        Text('Utilities', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+        const SizedBox(height: CRMSpacing.s),
+        if (isMobile) ...[
+          _buildCustomBooleanField(label: 'Electricity', key: 'electricity'),
+          _buildCustomBooleanField(label: 'Water Supply', key: 'water_supply'),
+          _buildCustomBooleanField(label: 'Borewell', key: 'borewell'),
+          _buildCustomBooleanField(label: 'Sewer Connection', key: 'sewer_connection'),
+          _buildCustomBooleanField(label: 'Drainage', key: 'drainage'),
+          if (isIndustrial) ...[
+            _buildCustomBooleanField(label: 'Power Backup', key: 'power_backup'),
+            _buildCustomBooleanField(label: 'Transformer', key: 'transformer'),
+            _buildCustomBooleanField(label: 'Gas Pipeline', key: 'gas_pipeline'),
+            _buildCustomBooleanField(label: 'Internet Connection', key: 'internet'),
+            _buildCustomBooleanField(label: 'Fire Fighting System', key: 'fire_fighting_system'),
+          ],
+        ] else ...[
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Electricity', key: 'electricity')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Water Supply', key: 'water_supply')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Borewell', key: 'borewell')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Sewer Connection', key: 'sewer_connection')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Drainage', key: 'drainage')),
+              const SizedBox(width: CRMSpacing.s),
+              if (isIndustrial) ...[
+                Expanded(child: _buildCustomBooleanField(label: 'Power Backup', key: 'power_backup')),
+              ] else ...[
+                const Expanded(child: SizedBox()),
+              ],
+            ],
+          ),
+          if (isIndustrial) ...[
+            Row(
+              children: [
+                Expanded(child: _buildCustomBooleanField(label: 'Transformer', key: 'transformer')),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomBooleanField(label: 'Gas Pipeline', key: 'gas_pipeline')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildCustomBooleanField(label: 'Internet Connection', key: 'internet')),
+                const SizedBox(width: CRMSpacing.s),
+                Expanded(child: _buildCustomBooleanField(label: 'Fire Fighting System', key: 'fire_fighting_system')),
+              ],
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildParkingLogisticsSection(bool isMobile, bool isIndustrial) {
+    if (!isIndustrial) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: CRMSpacing.l),
+        Text('Parking & Logistics', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+        const SizedBox(height: CRMSpacing.s),
+        if (isMobile) ...[
+          _buildCustomBooleanField(label: 'Truck Parking', key: 'truck_parking'),
+          _buildCustomBooleanField(label: 'Container Access', key: 'container_access'),
+          _buildCustomBooleanField(label: 'Loading Dock', key: 'loading_dock'),
+          _buildCustomBooleanField(label: 'Loading Bay', key: 'loading_bay'),
+          _buildCustomBooleanField(label: 'Crane Available', key: 'crane_available'),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Crane Capacity (Tons)', key: 'crane_capacity', isNumeric: true),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Truck Parking', key: 'truck_parking')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Container Access', key: 'container_access')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Loading Dock', key: 'loading_dock')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Loading Bay', key: 'loading_bay')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Crane Available', key: 'crane_available')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomTextField(label: 'Crane Capacity (Tons)', key: 'crane_capacity', isNumeric: true)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildIndustrialRoomsSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: CRMSpacing.l),
+        Text('Rooms & Building Space', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+        const SizedBox(height: CRMSpacing.s),
+        if (isMobile) ...[
+          _buildCustomBooleanField(label: 'Office Space Available', key: 'office_space'),
+          _buildCustomBooleanField(label: 'Mezzanine Floor Available', key: 'mezzanine_floor'),
+          _buildCustomBooleanField(label: 'Shed Area Available', key: 'shed_area'),
+          _buildCustomBooleanField(label: 'Pantry', key: 'pantry'),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Number of Cabins', key: 'cabins', isNumeric: true),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomTextField(label: 'Number of Meeting Rooms', key: 'meeting_rooms', isNumeric: true),
+          const SizedBox(height: CRMSpacing.m),
+          _buildCustomBooleanField(label: 'Reception Area', key: 'reception'),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Office Space Available', key: 'office_space')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Mezzanine Floor Available', key: 'mezzanine_floor')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Shed Area Available', key: 'shed_area')),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomBooleanField(label: 'Pantry', key: 'pantry')),
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              Expanded(child: _buildCustomTextField(label: 'Number of Cabins', key: 'cabins', isNumeric: true)),
+              const SizedBox(width: CRMSpacing.s),
+              Expanded(child: _buildCustomTextField(label: 'Number of Meeting Rooms', key: 'meeting_rooms', isNumeric: true)),
+            ],
+          ),
+          const SizedBox(height: CRMSpacing.m),
+          Row(
+            children: [
+              Expanded(child: _buildCustomBooleanField(label: 'Reception Area', key: 'reception')),
+              const SizedBox(width: CRMSpacing.s),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildPricingStep(bool isMobile) {
     final selectedCategoryItem = widget.metadata.categories.firstWhere(
       (c) => c.id == _selectedCategory,
@@ -1891,6 +2341,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
     final categoryName = selectedCategoryItem.name.trim().toLowerCase();
     final isIndustrial = categoryName.contains('industrial') || selectedCategoryItem.id == 'industrial';
     final isCommercial = categoryName.contains('commercial') || selectedCategoryItem.id == 'commercial';
+    final isLand = categoryName.contains('land') || categoryName.contains('plot');
 
     final selectedTypeItem = widget.metadata.types.firstWhere(
       (t) => t.id == _selectedType,
@@ -1915,10 +2366,6 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
       orElse: () => LookupItem(id: '', name: ''),
     );
     final listingName = selectedListingTypeItem.name.trim();
-    final isReSale = listingName.toLowerCase().contains('sale') ||
-        listingName.toLowerCase().contains('resale') ||
-        selectedListingTypeItem.id == 'resale' ||
-        selectedListingTypeItem.id == 'sale';
     final isRent = listingName.toLowerCase() == 'rent' || selectedListingTypeItem.id == 'rent';
 
     final String priceLabel;
@@ -1954,7 +2401,10 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         labelText: 'Super Builtup Area *(In Sq.ft)',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
       ),
-      validator: (v) => v!.isEmpty ? 'Area required' : null,
+      validator: (v) {
+        if (isLand) return null;
+        return (v == null || v.isEmpty) ? 'Area required' : null;
+      },
       onChanged: (_) {
         if (_carpetController.text.isNotEmpty) {
           setState(() {});
@@ -2330,14 +2780,14 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         children: [
           if (isMobile) ...[
             priceField,
-            if (isRent) ...[
+            if (isRent && !isLand) ...[
               const SizedBox(height: CRMSpacing.m),
               depositMonthsField,
               const SizedBox(height: CRMSpacing.m),
               depositField,
             ],
           ] else ...[
-            if (!isRent)
+            if (!isRent || isLand)
               priceField
             else
               Row(
@@ -2350,7 +2800,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                 ],
               ),
           ],
-          if (isRent) ...[
+          if (isRent && !isLand) ...[
             const SizedBox(height: CRMSpacing.m),
             TextFormField(
               controller: _maintenanceController,
@@ -2362,117 +2812,230 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
               ),
             ),
           ],
+          if (isLand || isIndustrial) ...[
+            const SizedBox(height: CRMSpacing.m),
+            _buildCustomBooleanField(label: 'Price Negotiable', key: 'negotiable', isRequired: true),
+          ],
+          if (isIndustrial && isRent) ...[
+            const SizedBox(height: CRMSpacing.m),
+            if (isMobile) ...[
+              _buildCustomTextField(label: 'Lock-in Period (Months)', key: 'lock_in_period', isNumeric: true, isRequired: true),
+              const SizedBox(height: CRMSpacing.m),
+              _buildCustomTextField(label: 'Lease Duration (Years)', key: 'lease_duration', isNumeric: true, isRequired: true),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: _buildCustomTextField(label: 'Lock-in Period (Months)', key: 'lock_in_period', isNumeric: true, isRequired: true)),
+                  const SizedBox(width: CRMSpacing.s),
+                  Expanded(child: _buildCustomTextField(label: 'Lease Duration (Years)', key: 'lease_duration', isNumeric: true, isRequired: true)),
+                ],
+              ),
+            ],
+          ],
+          if (!isLand) ...[
+            const SizedBox(height: CRMSpacing.m),
+            if (isMobile) ...[
+              superBuiltupField,
+              const SizedBox(height: CRMSpacing.m),
+              carpetField,
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: superBuiltupField),
+                  const SizedBox(width: CRMSpacing.s),
+                  Expanded(child: carpetField),
+                ],
+              ),
+            ],
+            if (isIndustrial) ...[
+              const SizedBox(height: CRMSpacing.m),
+              if (isMobile) ...[
+                _buildCustomTextField(label: 'Super Builtup Area (Sq.ft)', key: 'super_built_up_area_custom', isNumeric: true),
+                const SizedBox(height: CRMSpacing.m),
+                _buildCustomTextField(label: 'Ceiling Height (Ft)', key: 'ceiling_height', isNumeric: true, isRequired: true),
+                const SizedBox(height: CRMSpacing.m),
+                _buildCustomTextField(label: 'Floor Load Capacity (Tons/Sq.m)', key: 'floor_load_capacity', isNumeric: true, isRequired: true),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: _buildCustomTextField(label: 'Super Builtup Area (Sq.ft)', key: 'super_built_up_area_custom', isNumeric: true)),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: _buildCustomTextField(label: 'Ceiling Height (Ft)', key: 'ceiling_height', isNumeric: true, isRequired: true)),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: _buildCustomTextField(label: 'Floor Load Capacity (Tons/Sq.m)', key: 'floor_load_capacity', isNumeric: true, isRequired: true)),
+                  ],
+                ),
+              ],
+            ],
+          ],
           const SizedBox(height: CRMSpacing.m),
           if (isMobile) ...[
-            superBuiltupField,
-            const SizedBox(height: CRMSpacing.m),
-            carpetField,
+            TextFormField(
+              controller: _plotController,
+              style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Plot Area Size(In Sq.ft) ${isLand ? '*' : ''}',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+              ),
+              validator: (v) {
+                if (isLand && (v == null || v.trim().isEmpty)) {
+                  return 'Plot Area Size is required';
+                }
+                return null;
+              },
+            ),
+            if (isLand || isIndustrial) ...[
+              const SizedBox(height: CRMSpacing.m),
+              _buildCustomTextField(label: 'Open Area Size(In Sq.ft)', key: 'open_area', isNumeric: true, isRequired: isIndustrial),
+              const SizedBox(height: CRMSpacing.m),
+              _buildCustomDropdownField(label: 'Area Unit', key: 'area_unit', options: ['Sq.ft', 'Sq.Yard', 'Acre', 'Gunda', 'Bigha', 'Hectare'], isRequired: true),
+            ],
           ] else ...[
             Row(
               children: [
-                Expanded(child: superBuiltupField),
-                const SizedBox(width: CRMSpacing.s),
-                Expanded(child: carpetField),
+                Expanded(
+                  child: TextFormField(
+                    controller: _plotController,
+                    style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Plot Area Size(In Sq.ft) ${isLand ? '*' : ''}',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+                    ),
+                    validator: (v) {
+                      if (isLand && (v == null || v.trim().isEmpty)) {
+                        return 'Plot Area Size is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                if (isLand || isIndustrial) ...[
+                  const SizedBox(width: CRMSpacing.s),
+                  Expanded(child: _buildCustomTextField(label: 'Open Area Size(In Sq.ft)', key: 'open_area', isNumeric: true, isRequired: isIndustrial)),
+                  const SizedBox(width: CRMSpacing.s),
+                  Expanded(child: _buildCustomDropdownField(label: 'Area Unit', key: 'area_unit', options: ['Sq.ft', 'Sq.Yard', 'Acre', 'Gunda', 'Bigha', 'Hectare'], isRequired: true)),
+                ],
               ],
             ),
           ],
-          const SizedBox(height: CRMSpacing.m),
-          TextFormField(
-            controller: _plotController,
-            style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Plot Area Size(In Sq.ft)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
-            ),
-          ),
-          const SizedBox(height: CRMSpacing.l),
-          Text('Room & Floor Details', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
-          const SizedBox(height: CRMSpacing.s),
-          if (!showResidentialRooms) ...[
-            parkingField,
-          ] else ...[
-            if (isMobile) ...[
-              Row(
-                children: [
-                  Expanded(child: bedroomsField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: bathroomsField),
-                ],
-              ),
-              const SizedBox(height: CRMSpacing.m),
-              Row(
-                children: [
-                  Expanded(child: balconiesField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: parkingField),
-                ],
-              ),
+          _buildLandDetailsSection(isMobile, isLand, isIndustrial),
+          if (!isLand) ...[
+            const SizedBox(height: CRMSpacing.l),
+            Text('Room & Floor Details', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+            const SizedBox(height: CRMSpacing.s),
+            if (isIndustrial) ...[
+              if (isMobile) ...[
+                bathroomsField,
+                const SizedBox(height: CRMSpacing.m),
+                parkingField,
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: bathroomsField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: parkingField),
+                  ],
+                ),
+              ],
+              _buildIndustrialRoomsSection(isMobile),
+            ] else if (!showResidentialRooms) ...[
+              parkingField,
             ] else ...[
-              Row(
-                children: [
-                  Expanded(child: bedroomsField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: bathroomsField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: balconiesField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: parkingField),
-                ],
-              ),
+              if (isMobile) ...[
+                Row(
+                  children: [
+                    Expanded(child: bedroomsField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: bathroomsField),
+                  ],
+                ),
+                const SizedBox(height: CRMSpacing.m),
+                Row(
+                  children: [
+                    Expanded(child: balconiesField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: parkingField),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: bedroomsField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: bathroomsField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: balconiesField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: parkingField),
+                  ],
+                ),
+              ],
+            ],
+            const SizedBox(height: CRMSpacing.m),
+            if (isBungalow) ...[
+              if (isMobile) ...[
+                unitNoField,
+                const SizedBox(height: CRMSpacing.m),
+                ageField,
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: unitNoField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: ageField),
+                  ],
+                ),
+              ],
+            ] else if (isIndustrial || showFloors) ...[
+              if (isMobile) ...[
+                floorNoField,
+                const SizedBox(height: CRMSpacing.m),
+                totalFloorField,
+                const SizedBox(height: CRMSpacing.m),
+                ageField,
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: floorNoField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: totalFloorField),
+                    const SizedBox(width: CRMSpacing.s),
+                    Expanded(child: ageField),
+                  ],
+                ),
+              ],
+            ] else ...[
+              ageField,
             ],
           ],
-          const SizedBox(height: CRMSpacing.m),
-          if (isBungalow) ...[
-            if (isMobile) ...[
-              unitNoField,
-              const SizedBox(height: CRMSpacing.m),
-              ageField,
-            ] else ...[
-              Row(
-                children: [
-                  Expanded(child: unitNoField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: ageField),
-                ],
-              ),
-            ],
-          ] else if (showFloors) ...[
-            if (isMobile) ...[
-              floorNoField,
-              const SizedBox(height: CRMSpacing.m),
-              totalFloorField,
-              const SizedBox(height: CRMSpacing.m),
-              ageField,
-            ] else ...[
-              Row(
-                children: [
-                  Expanded(child: floorNoField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: totalFloorField),
-                  const SizedBox(width: CRMSpacing.s),
-                  Expanded(child: ageField),
-                ],
-              ),
-            ],
-          ] else ...[
-            ageField,
-          ],
+          _buildLegalDetailsSection(isMobile, isLand, isIndustrial),
+          _buildUtilitiesSection(isMobile, isLand, isIndustrial),
+          _buildParkingLogisticsSection(isMobile, isIndustrial),
           const SizedBox(height: CRMSpacing.l),
           Text('Property Attributes', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
           const SizedBox(height: CRMSpacing.s),
           if (isMobile) ...[
-            furnishingField,
-            const SizedBox(height: CRMSpacing.m),
+            if (!isLand && !isIndustrial) ...[
+              furnishingField,
+              const SizedBox(height: CRMSpacing.m),
+            ],
             facingField,
             const SizedBox(height: CRMSpacing.m),
             brokerageField,
           ] else ...[
             Row(
               children: [
-                Expanded(child: furnishingField),
-                const SizedBox(width: CRMSpacing.s),
-                Expanded(child: facingField),
+                if (!isLand && !isIndustrial) ...[
+                  Expanded(child: furnishingField),
+                  const SizedBox(width: CRMSpacing.s),
+                  Expanded(child: facingField),
+                ] else ...[
+                  Expanded(child: facingField),
+                  const SizedBox(width: CRMSpacing.s),
+                  const Expanded(child: SizedBox()),
+                ],
               ],
             ),
             const SizedBox(height: CRMSpacing.m),
@@ -2484,47 +3047,49 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
               ],
             ),
           ],
-          const SizedBox(height: CRMSpacing.l),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Amenities', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
-              TextButton.icon(
-                onPressed: _showAddAmenityDialog,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                label: const Text('Add Custom Amenity'),
-                style: TextButton.styleFrom(
-                  foregroundColor: CRMColors.primaryOf(context),
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          if (!isLand && !isIndustrial) ...[
+            const SizedBox(height: CRMSpacing.l),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Amenities', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
+                TextButton.icon(
+                  onPressed: _showAddAmenityDialog,
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                  label: const Text('Add Custom Amenity'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: CRMColors.primaryOf(context),
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: CRMSpacing.s),
-          Wrap(
-            spacing: CRMSpacing.s,
-            runSpacing: CRMSpacing.xs,
-            children: _localAmenities.map((amenity) {
-              final isSelected = _selectedAmenities.contains(amenity.id);
-              return FilterChip(
-                label: Text(amenity.name),
-                selected: isSelected,
-                selectedColor: CRMColors.primaryOf(context).withOpacity(0.12),
-                checkmarkColor: CRMColors.primaryOf(context),
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedAmenities.add(amenity.id);
-                    } else {
-                      _selectedAmenities.remove(amenity.id);
-                    }
-                  });
-                },
-              );
-            }).toList(),
-          ),
+              ],
+            ),
+            const SizedBox(height: CRMSpacing.s),
+            Wrap(
+              spacing: CRMSpacing.s,
+              runSpacing: CRMSpacing.xs,
+              children: _localAmenities.map((amenity) {
+                final isSelected = _selectedAmenities.contains(amenity.id);
+                return FilterChip(
+                  label: Text(amenity.name),
+                  selected: isSelected,
+                  selectedColor: CRMColors.primaryOf(context).withOpacity(0.12),
+                  checkmarkColor: CRMColors.primaryOf(context),
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedAmenities.add(amenity.id);
+                      } else {
+                        _selectedAmenities.remove(amenity.id);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
