@@ -295,6 +295,7 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
       final List<_DetailItem> basicItems = [];
       
       final listingType = getValue(p, 'listing_type_name');
+      final isRent = listingType.toLowerCase() == 'rent';
       if (listingType.isNotEmpty && listingType != 'N/A') {
         basicItems.add(_DetailItem('Listing Type', listingType, Icons.sell_outlined));
       }
@@ -323,7 +324,9 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
       
       final maintenanceVal = p['maintenance'] != null ? double.tryParse(p['maintenance'].toString()) : null;
       final maintenanceStr = (maintenanceVal != null && maintenanceVal > 0) ? CRMCurrencyFormatter.format(maintenanceVal) : "₹0";
-      basicItems.add(_DetailItem('Maintenance', '$maintenanceStr/mo', Icons.build_circle_outlined));
+      if (isRent) {
+        basicItems.add(_DetailItem('Maintenance', '$maintenanceStr/mo', Icons.build_circle_outlined));
+      }
       
 
 
@@ -403,13 +406,11 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
         specsItems.add(_DetailItem('Facing', facing, Icons.compass_calibration_outlined));
       }
       
-      if (p['possession_date'] != null) {
-        try {
-          final posDate = DateTime.tryParse(p['possession_date'].toString());
-          if (posDate != null) {
-            specsItems.add(_DetailItem('Possession Date', DateFormat('dd-MM-yyyy').format(posDate), Icons.event_available_rounded));
-          }
-        } catch (_) {}
+      final availFrom = _getAvailableFromFormatted(p);
+      if (availFrom != null) {
+        specsItems.add(_DetailItem('Available From', availFrom, Icons.event_available_rounded));
+      } else {
+        specsItems.add(_DetailItem('Available From', 'Not Available', Icons.event_busy_rounded));
       }
       
       final parkingVal = p['parking'] != null ? int.tryParse(p['parking'].toString()) : 0;
@@ -552,16 +553,18 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
           ),
           const SizedBox(height: CRMSpacing.l),
 
-          Text("Pricing details", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
-          const SizedBox(height: CRMSpacing.s),
-          Row(
-            children: [
-              _buildPriceTag("Deposit", depositStr),
-              const SizedBox(width: CRMSpacing.m),
-              _buildPriceTag("Maintenance", "$maintenanceStr/mo"),
-            ],
-          ),
-          const SizedBox(height: CRMSpacing.l),
+          if (listingType.toLowerCase() == 'rent') ...[
+            Text("Pricing details", style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: CRMColors.textOf(context))),
+            const SizedBox(height: CRMSpacing.s),
+            Row(
+              children: [
+                _buildPriceTag("Deposit", depositStr),
+                const SizedBox(width: CRMSpacing.m),
+                _buildPriceTag("Maintenance", "$maintenanceStr/mo"),
+              ],
+            ),
+            const SizedBox(height: CRMSpacing.l),
+          ],
 
           // Render Basic Details Card
           if (basicItems.isNotEmpty) ...[
@@ -919,6 +922,48 @@ class _PublicPropertyDetailScreenState extends State<PublicPropertyDetailScreen>
         ],
       ),
     );
+  }
+
+  String? _getAvailableFromFormatted(Map<String, dynamic> p) {
+    final statusNameRaw = (p['property_status_name'] ?? '').toString().toLowerCase();
+    final statusId = (p['property_status_id'] ?? '').toString();
+    final possessionDateStr = p['possession_date']?.toString();
+    DateTime? possessionDate;
+    if (possessionDateStr != null && possessionDateStr.isNotEmpty) {
+      possessionDate = DateTime.tryParse(possessionDateStr);
+    }
+    
+    // Calculate statusDisplayName
+    String statusDisplayName = statusNameRaw;
+    if (statusNameRaw.contains('to be available') || statusId == 'to_be_available') {
+      if (possessionDate != null) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final avail = DateTime(possessionDate.year, possessionDate.month, possessionDate.day);
+        if (today.isAfter(avail) || today.isAtSameMomentAs(avail)) {
+          statusDisplayName = 'available';
+        } else {
+          final df = DateFormat('dd-MM-yyyy');
+          statusDisplayName = 'to be available (${df.format(possessionDate)})';
+        }
+      } else {
+        statusDisplayName = 'to be available';
+      }
+    }
+    
+    final isAvailableStatus = statusDisplayName.contains('available') || 
+                              statusId == 'available' || 
+                              statusId == 'to_be_available';
+                              
+    if (!isAvailableStatus) {
+      return null;
+    }
+    
+    if (possessionDate != null) {
+      return DateFormat('MMMM d, yyyy').format(possessionDate);
+    }
+    
+    return 'Immediate';
   }
 }
 

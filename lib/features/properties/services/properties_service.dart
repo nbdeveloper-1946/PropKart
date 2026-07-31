@@ -236,6 +236,42 @@ class PropertiesService {
     }
   }
 
+  Future<Map<String, dynamic>> updateCity(String id, String name, {String state = "Gujarat", String country = "India"}) async {
+    try {
+      final response = await _apiClient.put('/properties/cities/$id', {
+        'city_name': name,
+        'state': state,
+        'country': country,
+      });
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw ApiException(message: "Invalid response format from server.");
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    } catch (e) {
+      throw ApiException(message: e.toString());
+    }
+  }
+
+  Future<Map<String, dynamic>> updateArea(String id, String cityId, String name, String pincode) async {
+    try {
+      final response = await _apiClient.put('/properties/areas/$id', {
+        'city_id': cityId,
+        'area_name': name,
+        'pincode': pincode,
+      });
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw ApiException(message: "Invalid response format from server.");
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    } catch (e) {
+      throw ApiException(message: e.toString());
+    }
+  }
+
   Future<Map<String, dynamic>> getBinProperties() async {
     try {
       final response = await _apiClient.get(

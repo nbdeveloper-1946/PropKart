@@ -1202,7 +1202,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBigFollowupTabSwitcher() {
+  Widget _buildBigFollowupTabSwitcher(int activeFollowups, int activeSiteVisits) {
     return Container(
       height: 48,
       padding: const EdgeInsets.all(CRMSpacing.xxs),
@@ -1214,18 +1214,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         children: [
           Expanded(
-            child: _buildBigFollowupTabButton('Follow-ups'),
+            child: _buildBigFollowupTabButton('Follow-ups', activeFollowups),
           ),
           const SizedBox(width: CRMSpacing.xxs),
           Expanded(
-            child: _buildBigFollowupTabButton('Site Visits'),
+            child: _buildBigFollowupTabButton('Site Visits', activeSiteVisits),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBigFollowupTabButton(String label) {
+  Widget _buildBigFollowupTabButton(String label, int count) {
     final isSelected = _activeFollowupSection == label;
     return GestureDetector(
       onTap: () => setState(() {
@@ -1244,7 +1244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         alignment: Alignment.center,
         child: Text(
-          label,
+          '$label ($count)',
           style: CRMTypography.bodyMedium.copyWith(
             color: isSelected ? CRMColors.primary : CRMColors.textSecondaryOf(context),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -1255,8 +1255,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildFollowups(List<DashboardFollowup> followups, List<DashboardSiteVisit> siteVisits) {
-    // 1. Filter followups by _selectedFollowupDate (default today)
+    // 1. Filter followups by _selectedFollowupDate (default today) and status
     final filteredFollowups = followups.where((f) {
+      final statusLower = f.status.toLowerCase();
+      if (statusLower == 'completed' || statusLower == 'resolved' || statusLower == 'closed' || statusLower == 'done') {
+        return false;
+      }
       final parsed = DateTime.tryParse(f.followupDate);
       if (parsed == null) return false;
       return parsed.year == _selectedFollowupDate.year &&
@@ -1271,8 +1275,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return dateB.compareTo(dateA); // Latest on top
     });
 
-    // Filter site visits by _selectedFollowupDate
+    // Filter site visits by _selectedFollowupDate and status
     final filteredSiteVisits = siteVisits.where((sv) {
+      final statusLower = sv.status.toLowerCase();
+      if (statusLower == 'completed' || statusLower == 'resolved' || statusLower == 'closed' || statusLower == 'done') {
+        return false;
+      }
       final parsed = DateTime.tryParse(sv.visitDate);
       if (parsed == null) return false;
       return parsed.year == _selectedFollowupDate.year &&
@@ -1344,7 +1352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildBigFollowupTabSwitcher(),
+            _buildBigFollowupTabSwitcher(filteredFollowups.length, filteredSiteVisits.length),
             const SizedBox(height: CRMSpacing.m),
             if (isMobile) ...[
               Align(

@@ -85,7 +85,8 @@ class BuildPropertyDetailWidget extends StatelessWidget {
       basicItems.add(PropertyDetailItem('Status', property.statusDisplayName, Icons.info_outline_rounded));
     }
     basicItems.add(PropertyDetailItem('Price', '₹${BudgetFormatter.format(property.price)}', Icons.payments_outlined));
-    if (property.deposit > 0) {
+    final isRent = property.listingTypeName.toLowerCase() == 'rent';
+    if (isRent && property.deposit > 0) {
       basicItems.add(PropertyDetailItem('Deposit', '₹${BudgetFormatter.format(property.deposit)}', Icons.account_balance_wallet_outlined));
     }
     if (property.maintenance > 0) {
@@ -155,8 +156,11 @@ class BuildPropertyDetailWidget extends StatelessWidget {
     if (_isValidValue(property.facingTypeName)) {
       specsItems.add(PropertyDetailItem('Facing', property.facingTypeName!, Icons.compass_calibration_outlined));
     }
-    if (property.possessionDate != null) {
-      specsItems.add(PropertyDetailItem('Possession Date', DateFormat('dd-MM-yyyy').format(property.possessionDate!), Icons.event_available_rounded));
+    final availFrom = property.availableFromFormatted;
+    if (availFrom != null) {
+      specsItems.add(PropertyDetailItem('Available From', availFrom, Icons.event_available_rounded));
+    } else {
+      specsItems.add(PropertyDetailItem('Available From', 'Not Available', Icons.event_busy_rounded));
     }
     if (property.parking > 0) {
       specsItems.add(PropertyDetailItem('Parking', _getParkingDisplay(property.parking), Icons.local_parking_rounded));

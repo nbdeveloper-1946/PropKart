@@ -1412,13 +1412,11 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                           orElse: () => LookupItem(id: '', name: ''),
                         );
                         final listingName = selectedListingTypeItem.name.trim();
-                        final isReSale = listingName.toLowerCase().contains('sale') ||
-                            listingName.toLowerCase().contains('resale') ||
-                            selectedListingTypeItem.id == 'resale' ||
-                            selectedListingTypeItem.id == 'sale';
-                        if (isReSale) {
+                        final isRent = listingName.toLowerCase() == 'rent' || selectedListingTypeItem.id == 'rent';
+                        if (!isRent) {
                           _selectedDepositMonth = null;
                           _depositController.text = CRMCurrencyFormatter.format(0.0);
+                          _maintenanceController.text = '';
                         }
                         _onPriceChanged();
                       });
@@ -1487,13 +1485,11 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                                 orElse: () => LookupItem(id: '', name: ''),
                               );
                               final listingName = selectedListingTypeItem.name.trim();
-                              final isReSale = listingName.toLowerCase().contains('sale') ||
-                                  listingName.toLowerCase().contains('resale') ||
-                                  selectedListingTypeItem.id == 'resale' ||
-                                  selectedListingTypeItem.id == 'sale';
-                              if (isReSale) {
+                              final isRent = listingName.toLowerCase() == 'rent' || selectedListingTypeItem.id == 'rent';
+                              if (!isRent) {
                                 _selectedDepositMonth = null;
                                 _depositController.text = CRMCurrencyFormatter.format(0.0);
+                                _maintenanceController.text = '';
                               }
                               _onPriceChanged();
                             });
@@ -1923,6 +1919,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         listingName.toLowerCase().contains('resale') ||
         selectedListingTypeItem.id == 'resale' ||
         selectedListingTypeItem.id == 'sale';
+    final isRent = listingName.toLowerCase() == 'rent' || selectedListingTypeItem.id == 'rent';
 
     final String priceLabel;
     if (listingName.isNotEmpty) {
@@ -2306,7 +2303,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
               const DropdownMenuItem(value: null, child: Text('None')),
               ..._depositMonthOptions.map((m) => DropdownMenuItem(value: m, child: Text(m))),
             ],
-            validator: (v) => v == null || v.isEmpty ? 'Deposit months required' : null,
+            validator: (v) => isRent && (v == null || v.isEmpty) ? 'Deposit months required' : null,
             onChanged: (v) {
               setState(() {
                 _selectedDepositMonth = v;
@@ -2333,14 +2330,14 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         children: [
           if (isMobile) ...[
             priceField,
-            if (!isReSale) ...[
+            if (isRent) ...[
               const SizedBox(height: CRMSpacing.m),
               depositMonthsField,
               const SizedBox(height: CRMSpacing.m),
               depositField,
             ],
           ] else ...[
-            if (isReSale)
+            if (!isRent)
               priceField
             else
               Row(
@@ -2353,16 +2350,18 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                 ],
               ),
           ],
-          const SizedBox(height: CRMSpacing.m),
-          TextFormField(
-            controller: _maintenanceController,
-            style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Monthly Maintenance Charge',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+          if (isRent) ...[
+            const SizedBox(height: CRMSpacing.m),
+            TextFormField(
+              controller: _maintenanceController,
+              style: CRMTypography.body.copyWith(color: CRMColors.textOf(context)),
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Monthly Maintenance Charge',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(CRMBorderRadius.s)),
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: CRMSpacing.m),
           if (isMobile) ...[
             superBuiltupField,

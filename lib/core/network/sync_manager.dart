@@ -383,7 +383,7 @@ class SyncManager {
     for (final table in tablesToRefresh) {
       if (table == "properties") _coordinator.refreshProperties();
       else if (table == "requirements") _coordinator.refreshRequirements();
-      else if (table == "followups") _coordinator.refreshDashboard();
+      else if (table == "followups" || table == "site_visits") _coordinator.refreshDashboard();
       else if (table == "builders") _coordinator.refreshBuilders();
       else if (table == "owners") _coordinator.refreshOwners();
     }

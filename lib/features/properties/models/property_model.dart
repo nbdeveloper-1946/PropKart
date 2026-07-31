@@ -317,18 +317,41 @@ class PropertyModel {
   bool get isStatusAvailable {
     return statusDisplayName.toLowerCase() == 'available';
   }
+
+  String? get availableFromFormatted {
+    final statusName = statusDisplayName.toLowerCase();
+    
+    // Checked statuses that represent availability
+    final isAvailableStatus = statusName.contains('available') || 
+                              propertyStatusId == 'available' || 
+                              propertyStatusId == 'to_be_available';
+                              
+    if (!isAvailableStatus) {
+      return null;
+    }
+    
+    if (possessionDate != null) {
+      return DateFormat('MMMM d, yyyy').format(possessionDate!);
+    }
+    
+    return 'Immediate';
+  }
 }
 
 class LookupItem {
   final String id;
   final String name;
   final String? categoryId;
-  LookupItem({required this.id, required this.name, this.categoryId});
+  final String? state;
+  final String? country;
+  LookupItem({required this.id, required this.name, this.categoryId, this.state, this.country});
   factory LookupItem.fromJson(Map<String, dynamic> json) {
     return LookupItem(
       id: json['id'] as String,
       name: (json['name'] ?? json['city_name'] ?? json['area_name'] ?? '') as String,
       categoryId: json['category_id'] as String?,
+      state: json['state'] as String?,
+      country: json['country'] as String?,
     );
   }
 }

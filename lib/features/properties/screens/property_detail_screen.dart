@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../properties/models/property_model.dart';
 import '../../properties/repository/properties_repository.dart';
@@ -20,11 +21,23 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   PropertyModel? _property;
   bool _isLoading = true;
   String? _error;
+  StreamSubscription? _propertiesSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadProperty();
+    _propertiesSubscription = RepositoryCoordinator().propertiesStream.listen((_) {
+      if (mounted) {
+        _loadProperty();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _propertiesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadProperty() async {

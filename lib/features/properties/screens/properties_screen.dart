@@ -282,15 +282,51 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   ],
                 ),
                 const SizedBox(height: CRMSpacing.xs),
-                Row(
+                Wrap(
+                  spacing: CRMSpacing.m,
+                  runSpacing: CRMSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.calendar_today_outlined,
-                        size: 14, color: CRMColors.textSecondaryOf(context)),
-                    const SizedBox(width: 4),
-                    Text(
-                      DateFormat('dd-MM-yyyy').format(p.createdAt),
-                      style: CRMTypography.caption
-                          .copyWith(color: CRMColors.textSecondaryOf(context)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_outlined,
+                            size: 14, color: CRMColors.textSecondaryOf(context)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Created: ${DateFormat('dd-MM-yyyy').format(p.createdAt)}',
+                          style: CRMTypography.caption
+                              .copyWith(color: CRMColors.textSecondaryOf(context)),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          p.availableFromFormatted != null 
+                              ? Icons.event_available_rounded 
+                              : Icons.event_busy_rounded,
+                          size: 14,
+                          color: p.availableFromFormatted != null 
+                              ? CRMColors.success 
+                              : CRMColors.textSecondaryOf(context),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          p.availableFromFormatted != null 
+                              ? 'Available: ${p.availableFromFormatted}' 
+                              : 'Not Available',
+                          style: CRMTypography.caption.copyWith(
+                            color: p.availableFromFormatted != null 
+                                ? CRMColors.success 
+                                : CRMColors.textSecondaryOf(context),
+                            fontWeight: p.availableFromFormatted != null 
+                                ? FontWeight.bold 
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -669,7 +705,45 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                   ? p.createdByName
                                   : '-',
                             )),
-                          DataCell(Text(p.title)),
+                          DataCell(
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      p.availableFromFormatted != null 
+                                          ? Icons.event_available_rounded 
+                                          : Icons.event_busy_rounded,
+                                      size: 12,
+                                      color: p.availableFromFormatted != null 
+                                          ? CRMColors.success 
+                                          : CRMColors.textSecondaryOf(context),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      p.availableFromFormatted != null 
+                                          ? 'Available: ${p.availableFromFormatted}' 
+                                          : 'Not Available',
+                                      style: TextStyle(
+                                        color: p.availableFromFormatted != null 
+                                            ? CRMColors.success 
+                                            : CRMColors.textSecondaryOf(context),
+                                        fontSize: 10.5,
+                                        fontWeight: p.availableFromFormatted != null 
+                                            ? FontWeight.bold 
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                           DataCell(
                             Padding(
                               padding:

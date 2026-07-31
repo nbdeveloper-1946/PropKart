@@ -21,6 +21,7 @@ import '../../modules/legal/presentation/privacy_policy_page.dart';
 import '../design_system/widgets/app_shell.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/audit_logs_screen.dart';
+import '../../features/settings/screens/location_config_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/properties/screens/recycle_bin_screen.dart';
 import '../network/sync_manager.dart';
@@ -124,6 +125,10 @@ class AppRouter {
           GoRoute(
             path: '/settings/audit-logs',
             builder: (context, state) => const AuditLogsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/location-config',
+            builder: (context, state) => const LocationConfigScreen(),
           ),
           GoRoute(
             path: '/profile',
