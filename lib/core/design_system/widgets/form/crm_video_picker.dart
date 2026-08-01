@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:propkart/core/api/dio_client.dart';
+import 'package:propkart/core/api/cloudinary_uploader.dart';
 import '../../tokens/app_colors.dart';
 import '../../tokens/app_spacing.dart';
 import '../../tokens/app_typography.dart';
@@ -94,48 +95,32 @@ class _CRMVideoPickerState extends State<CRMVideoPicker> {
     });
 
     try {
-      MultipartFile multipartFile;
+      List<int> uploadBytes;
       final mimeType = _lookupMimeType(pickedFile.name);
 
       if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
-        if (bytes.length > 50 * 1024 * 1024) {
-          throw Exception("Video size exceeds the 50 MB limit.");
+        uploadBytes = await pickedFile.readAsBytes();
+        if (uploadBytes.length > 100 * 1024 * 1024) {
+          throw Exception("Video size exceeds the 100 MB limit.");
         }
-        multipartFile = MultipartFile.fromBytes(
-          bytes,
-          filename: pickedFile.name,
-          contentType: MediaType.parse(mimeType),
-        );
       } else {
         final file = File(pickedFile.path);
         final length = await file.length();
-        if (length > 50 * 1024 * 1024) {
-          throw Exception("Video size exceeds the 50 MB limit.");
+        if (length > 100 * 1024 * 1024) {
+          throw Exception("Video size exceeds the 100 MB limit.");
         }
-        multipartFile = await MultipartFile.fromFile(
-          file.path,
-          filename: pickedFile.name,
-          contentType: MediaType.parse(mimeType),
-        );
+        uploadBytes = await file.readAsBytes();
       }
 
-      final formData = FormData.fromMap({
-        'file': multipartFile,
-      });
-
-      final dio = DioClient.dio;
-      final response = await dio.post(
-        widget.uploadEndpoint,
-        data: formData,
+      final url = await CloudinaryUploader.upload(
+        bytes: uploadBytes,
+        filename: pickedFile.name,
+        mimeType: mimeType,
+        resourceType: 'video',
+        fallbackEndpoint: widget.uploadEndpoint,
       );
 
-      if (response.statusCode == 201 && response.data['success'] == true) {
-        final url = response.data['data']['url'] as String;
-        widget.onVideoAdded(url);
-      } else {
-        throw Exception(response.data['message'] ?? "Upload failed.");
-      }
+      widget.onVideoAdded(url);
     } catch (e) {
       setState(() {
         _uploadError = e.toString().replaceAll("Exception: ", "");

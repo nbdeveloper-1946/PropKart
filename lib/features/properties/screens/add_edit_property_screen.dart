@@ -1768,7 +1768,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
                 _propertyVideos.removeAt(index);
               });
             },
-            maxVideos: 3,
+            maxVideos: 2,
             uploadEndpoint: '/properties/upload-media',
           ),
         ],

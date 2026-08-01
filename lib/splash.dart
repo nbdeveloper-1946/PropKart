@@ -254,8 +254,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
     } catch (_) {}
 
+    // Check if we are redirecting back to a previous page (e.g. on refresh/deep link)
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final isRedirect = from != null && from.isNotEmpty;
+
     final elapsed = DateTime.now().difference(_startTime);
-    final minDuration = const Duration(milliseconds: 3000); // 3.0 seconds cinematic animation
+    final minDuration = isRedirect ? Duration.zero : const Duration(milliseconds: 3000); // 3.0 seconds cinematic animation
     if (elapsed < minDuration) {
       await Future.delayed(minDuration - elapsed);
     }

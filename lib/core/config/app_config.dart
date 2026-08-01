@@ -1,4 +1,4 @@
 class AppConfig {
-  static const String publicShareBaseUrl = "https://propkart.vercel.app/share";
-  static const String backupShareBaseUrl = "https://nb-listings.vercel.app/share";
+  static const String publicShareBaseUrl = "https://propkart.nbpropertytech.com/share";
+  static const String backupShareBaseUrl = "https://propkart.nbpropertytech.com/share";
 }
