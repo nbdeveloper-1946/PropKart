@@ -501,8 +501,37 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               final matchesMyAdded = !_myAddedOnly || (p.createdBy == currentUserId);
               final matchesStatus = (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter.toLowerCase();
 
+              final cat = p.categoryName.toLowerCase();
+              bool matchesTabCategory = false;
+              if (_activeCategoryTab == 'Residential') {
+                matchesTabCategory = cat.contains('resident') ||
+                    cat.contains('apartment') ||
+                    cat.contains('flat') ||
+                    cat.contains('villa') ||
+                    cat.contains('house') ||
+                    cat.contains('bhk') ||
+                    (!cat.contains('commercial') &&
+                        !cat.contains('industrial') &&
+                        !cat.contains('land') &&
+                        !cat.contains('plot'));
+              } else if (_activeCategoryTab == 'Commercial') {
+                matchesTabCategory = cat.contains('commercial') ||
+                    cat.contains('office') ||
+                    cat.contains('shop') ||
+                    cat.contains('showroom') ||
+                    cat.contains('retail');
+              } else if (_activeCategoryTab == 'Industrial') {
+                matchesTabCategory = cat.contains('industrial') ||
+                    cat.contains('factory') ||
+                    cat.contains('warehouse') ||
+                    cat.contains('shed');
+              } else if (_activeCategoryTab == 'Land & Plot') {
+                matchesTabCategory = cat.contains('land') || cat.contains('plot');
+              }
+
               return matchesListing &&
                   matchesCategory &&
+                  matchesTabCategory &&
                   matchesConfig &&
                   matchesArea &&
                   matchesSearch &&
@@ -1367,6 +1396,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               if (selected) {
                 setState(() {
                   _activeCategoryTab = cat;
+                  _currentPage = 0;
                 });
               }
             },

@@ -243,7 +243,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   void _changeStatus(RequirementModel req, String newStatus) {
-    if (newStatus == req.status) return;
+    if (newStatus == req.status && newStatus != 'Follow-up') return;
     if (!_isValidStatusTransition(req.status, newStatus)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1089,16 +1089,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           PopupMenuButton<String>(
                             tooltip: 'Change Status',
                             onSelected: (String newStatus) => _changeStatus(req, newStatus),
-                            itemBuilder: (BuildContext context) => const [
-                              PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
-                              PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
-                              PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
-                              PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
-                              PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
-                              PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                            itemBuilder: (BuildContext context) => [
+                              const PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
+                              const PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                              PopupMenuItem<String>(value: 'Follow-up', child: Text(req.status == 'Follow-up' ? 'Next follow up' : 'Follow-up')),
+                              const PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              const PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
+                              const PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
+                              const PopupMenuItem<String>(value: 'Won', child: Text('Won')),
+                              const PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
+                              const PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
                             ],
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,
@@ -1508,16 +1508,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       PopupMenuButton<String>(
                         tooltip: 'Change Status',
                         onSelected: (String newStatus) => _changeStatus(req, newStatus),
-                        itemBuilder: (BuildContext context) => const [
-                          PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                          PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
-                          PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                          PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
-                          PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
-                          PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
-                          PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                          PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
-                          PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                        itemBuilder: (BuildContext context) => [
+                          const PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
+                          const PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                          PopupMenuItem<String>(value: 'Follow-up', child: Text(req.status == 'Follow-up' ? 'Next follow up' : 'Follow-up')),
+                          const PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                          const PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
+                          const PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
+                          const PopupMenuItem<String>(value: 'Won', child: Text('Won')),
+                          const PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
+                          const PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
                         ],
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xxs),
@@ -2502,16 +2502,16 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           PopupMenuButton<String>(
                             tooltip: 'Change Status',
                             onSelected: (String newStatus) => _changeStatus(req, newStatus),
-                            itemBuilder: (BuildContext context) => const [
-                              PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
-                              PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
-                              PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
-                              PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
-                              PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
-                              PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                            itemBuilder: (BuildContext context) => [
+                              const PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
+                              const PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                              PopupMenuItem<String>(value: 'Follow-up', child: Text(req.status == 'Follow-up' ? 'Next follow up' : 'Follow-up')),
+                              const PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              const PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
+                              const PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
+                              const PopupMenuItem<String>(value: 'Won', child: Text('Won')),
+                              const PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
+                              const PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
                             ],
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,
@@ -3284,6 +3284,7 @@ class _CRMPropertyMatchesDrawerState extends State<_CRMPropertyMatchesDrawer> {
 String displayStatusLabel(String status) {
   if (status == 'Live' || status == 'Active') return 'Interested';
   if (status == 'Dead' || status == 'Suspended') return 'Not Interested';
+  if (status == 'Follow-up') return 'Next follow up';
   return status;
 }
 

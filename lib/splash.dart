@@ -193,7 +193,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           });
         }
 
-        if (SyncManager().isSyncCompleted) {
+        final hasCache = await SyncManager().hasLocalCache();
+        if (hasCache || SyncManager().isSyncCompleted) {
           SyncManager().performStartupSync().catchError((e) {
             // Log background refresh failures but proceed
           });

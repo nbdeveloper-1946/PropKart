@@ -2022,12 +2022,12 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
           const SizedBox(height: CRMSpacing.m),
           _buildCustomTextField(label: 'Plot Width (Ft)', key: 'plot_width', isNumeric: true, isRequired: isLand),
           const SizedBox(height: CRMSpacing.m),
-          _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: true),
+          _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: false),
           const SizedBox(height: CRMSpacing.m),
-          _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: true),
+          _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: false),
           const SizedBox(height: CRMSpacing.m),
           if (isLand) ...[
-            _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: true),
+            _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: false),
             const SizedBox(height: CRMSpacing.m),
           ],
           _buildCustomBooleanField(label: 'Corner Plot', key: 'corner_plot'),
@@ -2044,16 +2044,16 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
           const SizedBox(height: CRMSpacing.m),
           Row(
             children: [
-              Expanded(child: _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: true)),
+              Expanded(child: _buildCustomTextField(label: 'Frontage (Ft)', key: 'frontage', isNumeric: true, isRequired: false)),
               const SizedBox(width: CRMSpacing.s),
-              Expanded(child: _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: true)),
+              Expanded(child: _buildCustomTextField(label: 'Road Width (Ft)', key: 'road_width', isNumeric: true, isRequired: false)),
             ],
           ),
           const SizedBox(height: CRMSpacing.m),
           Row(
             children: [
               if (isLand) ...[
-                Expanded(child: _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: true)),
+                Expanded(child: _buildCustomDropdownField(label: 'Plot Shape', key: 'plot_shape', options: ['Square', 'Rectangle', 'Triangular', 'Irregular', 'Other'], isRequired: false)),
                 const SizedBox(width: CRMSpacing.s),
               ],
               Expanded(child: _buildCustomBooleanField(label: 'Corner Plot', key: 'corner_plot')),
@@ -2081,17 +2081,17 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         Text('Legal Details', style: CRMTypography.captionBold.copyWith(color: CRMColors.textOf(context))),
         const SizedBox(height: CRMSpacing.s),
         if (isMobile) ...[
-          _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: isLand),
+          _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: false),
           const SizedBox(height: CRMSpacing.m),
           if (isLand) ...[
-            _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: true),
+            _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: false),
             const SizedBox(height: CRMSpacing.m),
-            _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: true),
+            _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: false),
             const SizedBox(height: CRMSpacing.m),
-            _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: true),
+            _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: false),
             const SizedBox(height: CRMSpacing.m),
           ],
-          _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true),
+          _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: !isLand && !isIndustrial),
           const SizedBox(height: CRMSpacing.m),
           if (isLand) ...[
             _buildCustomTextField(label: 'RERA Number', key: 'rera'),
@@ -2107,12 +2107,12 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
         ] else ...[
           Row(
             children: [
-              Expanded(child: _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: isLand)),
+              Expanded(child: _buildCustomTextField(label: 'Survey Number', key: 'survey_number', isRequired: false)),
               const SizedBox(width: CRMSpacing.s),
               if (isLand) ...[
-                Expanded(child: _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: true)),
+                Expanded(child: _buildCustomTextField(label: 'TP Scheme', key: 'tp_scheme', isRequired: false)),
               ] else ...[
-                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true)),
+                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: !isLand && !isIndustrial)),
               ],
             ],
           ),
@@ -2120,9 +2120,9 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
           Row(
             children: [
               if (isLand) ...[
-                Expanded(child: _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: true)),
+                Expanded(child: _buildCustomTextField(label: 'Final Plot Number', key: 'final_plot_number', isRequired: false)),
                 const SizedBox(width: CRMSpacing.s),
-                Expanded(child: _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: true)),
+                Expanded(child: _buildCustomDropdownField(label: 'NA Status', key: 'na_status', options: ['NA (Non-Agricultural)', 'NOC Pending', 'Agricultural', 'Commercial NA', 'Residential NA', 'Other'], isRequired: false)),
               ] else ...[
                 Expanded(child: _buildCustomBooleanField(label: 'Title Clear', key: 'title_clear')),
                 const SizedBox(width: CRMSpacing.s),
@@ -2134,7 +2134,7 @@ class _AddEditPropertyScreenState extends State<AddEditPropertyScreen> {
           Row(
             children: [
               if (isLand) ...[
-                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: true)),
+                Expanded(child: _buildCustomTextField(label: 'Zone', key: 'zone', isRequired: !isLand && !isIndustrial)),
                 const SizedBox(width: CRMSpacing.s),
                 Expanded(child: _buildCustomTextField(label: 'RERA Number', key: 'rera')),
               ] else ...[

@@ -188,7 +188,7 @@ class AppRouter {
       final loggingIn = state.matchedLocation == '/login';
       final onSplash = state.matchedLocation == '/splash';
       final onGetStarted = state.matchedLocation == '/get-started';
-      final isPublicShare = state.matchedLocation.startsWith('/share/');
+      final isPublicShare = state.matchedLocation.startsWith('/share/') || state.uri.path.startsWith('/share/');
       final onUsers = state.matchedLocation.startsWith('/users');
       final onAudit = state.matchedLocation.startsWith('/settings/audit-logs');
       final isAuthGate = loggingIn || onSplash || onGetStarted || isPublicShare;
