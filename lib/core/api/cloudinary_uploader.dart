@@ -32,7 +32,7 @@ class CloudinaryUploader {
         final String apiKey = data['apiKey'];
         final String cloudName = data['cloudName'];
         final String targetFolder = data['folder'];
-        final int quality = data['quality'] ?? 70;
+        final String transformation = data['transformation'] ?? 'q_70';
 
         // 2. Upload directly to Cloudinary
         final cloudinaryUrl = 'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload';
@@ -49,7 +49,7 @@ class CloudinaryUploader {
           'timestamp': timestamp,
           'signature': signature,
           'folder': targetFolder,
-          'quality': quality,
+          'transformation': transformation,
         });
 
         // Use a clean Dio instance to bypass our local JWT auth interceptor headers (so we don't leak cookies/tokens)
