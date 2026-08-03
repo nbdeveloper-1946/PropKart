@@ -287,7 +287,9 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
 
   List<LookupItem> _getFilteredTypes() {
     if (_selectedCategoryId == null) return [];
-    return _types.where((t) => t.categoryId == _selectedCategoryId).toList();
+    return _types
+        .where((t) => t.categoryId == _selectedCategoryId && t.name.toLowerCase() != 'apartment')
+        .toList();
   }
 
   List<LookupItem> _getFilteredConfigs() {
@@ -874,7 +876,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
                 DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
                 DropdownMenuItem(value: "Interested", child: Text("Interested")),
                 DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                 DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                 DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                 DropdownMenuItem(value: "Won", child: Text("Won")),

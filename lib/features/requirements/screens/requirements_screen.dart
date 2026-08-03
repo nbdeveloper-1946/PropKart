@@ -74,6 +74,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     super.initState();
     _loadMetadata();
     _triggerFetch();
+    context.read<UsersBloc>().add(const FetchUsers());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -453,7 +454,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Requirements Tracker",
+                "Leads Tracker",
                 style: CRMTypography.pageTitle.copyWith(color: CRMColors.text),
               ),
               const SizedBox(height: 4.0),
@@ -502,7 +503,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Requirements Tracker",
+                    "Leads Tracker",
                     style: CRMTypography.pageTitle.copyWith(color: CRMColors.text),
                   ),
                   const SizedBox(height: 4.0),
@@ -682,7 +683,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                         DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
                         DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                         DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
@@ -744,7 +745,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                         DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
                         DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                         DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
@@ -865,6 +866,94 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     return 'N/A';
   }
 
+  Widget _buildAssignToDropdown(RequirementModel req) {
+    return BlocBuilder<UsersBloc, UsersState>(
+      builder: (context, state) {
+        List<users_model.UserModel> salesmen = [];
+        if (state is UsersLoaded) {
+          salesmen = state.users.where((u) => u.roleName.toLowerCase() == 'sales').toList();
+        }
+
+        final String? currentAdminId = req.adminId;
+        final bool hasMatch = currentAdminId != null && salesmen.any((u) => u.id == currentAdminId);
+        final String currentName = _getSalesmanName(req, null);
+
+        return Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s),
+          decoration: BoxDecoration(
+            color: CRMColors.backgroundOf(context),
+            borderRadius: BorderRadius.circular(CRMBorderRadius.s),
+            border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              value: hasMatch ? currentAdminId : null,
+              hint: Text(
+                currentAdminId == null || currentAdminId.isEmpty ? 'Assign to...' : currentName,
+                style: CRMTypography.bodyMedium.copyWith(
+                  color: currentAdminId == null || currentAdminId.isEmpty 
+                      ? CRMColors.textSecondaryOf(context) 
+                      : CRMColors.textOf(context),
+                  fontWeight: currentAdminId == null || currentAdminId.isEmpty ? FontWeight.normal : FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(
+                    'Unassigned',
+                    style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
+                  ),
+                ),
+                ...salesmen.map((u) {
+                  return DropdownMenuItem<String?>(
+                    value: u.id,
+                    child: Text(
+                      u.fullName,
+                      style: CRMTypography.bodyMedium.copyWith(
+                        color: CRMColors.textOf(context),
+                        fontWeight: u.id == currentAdminId ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+              onChanged: (String? newSalesmanId) {
+                String? newSalesmanName;
+                if (newSalesmanId != null) {
+                  final u = salesmen.firstWhere((s) => s.id == newSalesmanId);
+                  newSalesmanName = u.fullName;
+                }
+                
+                context.read<RequirementsBloc>().add(
+                  UpdateRequirementEvent(
+                    req.copyWith(
+                      adminId: newSalesmanId ?? '',
+                      assigneeName: newSalesmanName ?? '',
+                    ),
+                  ),
+                );
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(newSalesmanName != null 
+                        ? 'Lead assigned to $newSalesmanName successfully.'
+                        : 'Lead unassigned successfully.'),
+                    backgroundColor: CRMColors.success,
+                  ),
+                );
+              },
+              icon: Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context), size: 18),
+              dropdownColor: CRMColors.cardBgOf(context),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
     if (currentUser == null) return false;
     if (currentUser.role == 'Super Admin') return true;
@@ -980,6 +1069,8 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                     const DataColumn(label: Text('Client')),
                     if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
                       const DataColumn(label: Text('Added By')),
+                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                      const DataColumn(label: Text('Assign to')),
                     const DataColumn(label: Text('Specs / Config')),
                     const DataColumn(label: Text('Budget Range')),
                     const DataColumn(label: Text('Target Area(s)')),
@@ -1038,6 +1129,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
+                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                          DataCell(
+                            _buildAssignToDropdown(req),
+                          ),
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1093,7 +1188,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
                               PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                               PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
@@ -1512,7 +1607,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                           PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
                           PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                           PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                          PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                          PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                           PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                           PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                           PopupMenuItem<String>(value: 'Won', child: Text('Won')),
@@ -2413,6 +2508,8 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                     const DataColumn(label: Text('Client')),
                     if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
                       const DataColumn(label: Text('Added By')),
+                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                      const DataColumn(label: Text('Assign to')),
                     const DataColumn(label: Text('Specs / Config')),
                     const DataColumn(label: Text('Budget Range')),
                     const DataColumn(label: Text('Target Area(s)')),
@@ -2450,6 +2547,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               _getSalesmanName(req, currentUser),
                               style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
                             ),
+                          ),
+                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                          DataCell(
+                            _buildAssignToDropdown(req),
                           ),
                         DataCell(
                           Column(
@@ -2506,7 +2607,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                               PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
                               PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                               PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
@@ -3284,6 +3385,7 @@ class _CRMPropertyMatchesDrawerState extends State<_CRMPropertyMatchesDrawer> {
 String displayStatusLabel(String status) {
   if (status == 'Live' || status == 'Active') return 'Interested';
   if (status == 'Dead' || status == 'Suspended') return 'Not Interested';
+  if (status == 'Site Visit') return 'Site Visit Sche.';
   return status;
 }
 

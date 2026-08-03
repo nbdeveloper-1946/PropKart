@@ -260,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       role = authState.user.role;
     }
 
-    String availableTitle = 'Available';
+    String availableTitle = 'Available Inventory';
     String siteVisitTitle = 'My Site Visits Done';
     String requirementsTitle = 'My Requirements';
     String wonTitle = 'My Won';
@@ -271,10 +271,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       requirementsTitle = 'All Requirements';
       wonTitle = 'All Won';
     } else if (role == 'Admin') {
-      availableTitle = 'Available';
-      siteVisitTitle = 'Team Site Visits Done';
-      requirementsTitle = 'Team Requirements';
-      wonTitle = 'Team Won';
+      availableTitle = 'Available Inventory';
+      siteVisitTitle = 'Site visits done';
+      requirementsTitle = 'Leads';
+      wonTitle = 'won';
     }
 
     final List<Widget> cards = [

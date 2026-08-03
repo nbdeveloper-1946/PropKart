@@ -31,6 +31,7 @@ class PropertiesRepository {
     String? createdBy,
     bool? isVerified,
     bool? includeDeleted,
+    bool refreshFromServer = false,
   }) async {
     final start = DateTime.now();
 
@@ -56,15 +57,17 @@ class PropertiesRepository {
       totalMs: totalMs,
     );
 
-    _triggerBackgroundPropertiesRefresh(
-      search: search,
-      categoryId: categoryId,
-      areaId: areaId,
-      listingTypeId: listingTypeId,
-      createdBy: createdBy,
-      isVerified: isVerified,
-      includeDeleted: includeDeleted,
-    );
+    if (refreshFromServer) {
+      _triggerBackgroundPropertiesRefresh(
+        search: search,
+        categoryId: categoryId,
+        areaId: areaId,
+        listingTypeId: listingTypeId,
+        createdBy: createdBy,
+        isVerified: isVerified,
+        includeDeleted: includeDeleted,
+      );
+    }
 
     return properties;
   }

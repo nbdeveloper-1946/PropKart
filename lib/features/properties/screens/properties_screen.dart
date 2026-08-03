@@ -56,7 +56,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   int _currentPage = 0;
   int _pageSize = 10;
   bool _myAddedOnly = false;
-  String _selectedStatusFilter = 'Available';
+  String? _selectedStatusFilter;
 
   static const _pageSizeOptions = [10, 25, 50];
 
@@ -463,6 +463,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               final matchesCategory = _selectedCategory == null ||
                   p.categoryId == _selectedCategory;
 
+              final matchesCategoryTab = _matchesActiveCategory(p);
+
               final matchesConfig = _selectedConfigurations.isEmpty ||
                   _selectedConfigurations.contains(p.configurationId);
 
@@ -499,7 +501,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               }
 
               final matchesMyAdded = !_myAddedOnly || (p.createdBy == currentUserId);
-              final matchesStatus = (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter.toLowerCase();
+              final matchesStatus = _selectedStatusFilter == null ||
+                  (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter!.toLowerCase();
 
               return matchesListing &&
                   matchesCategory &&
@@ -508,7 +511,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                   matchesSearch &&
                   matchesPrice &&
                   matchesMyAdded &&
-                  matchesStatus;
+                  matchesStatus &&
+                  matchesCategoryTab;
             }).toList();
 
             // Default sorting: Newest first (latest property appears first)
@@ -710,7 +714,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text(p.title ?? 'No Title', maxLines: 1, overflow: TextOverflow.ellipsis),
                                 const SizedBox(height: 2),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1058,7 +1062,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         Text('Workspace',
             style: CRMTypography.body.copyWith(color: CRMColors.textSecondaryOf(context))),
         Text(
-          'Properties Operating System',
+          'Available Inventory',
           style: CRMTypography.pageTitle.copyWith(
             color: CRMColors.textOf(context),
             fontSize: isMobile ? 20 : 26,
@@ -1115,7 +1119,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     }).toList();
 
     final filteredByStatus = filteredByMyAdded.where((p) {
-      return (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter.toLowerCase();
+      return _selectedStatusFilter == null ||
+          (p.propertyStatusName ?? '').toLowerCase() == _selectedStatusFilter!.toLowerCase();
     }).toList();
 
     final filteredByListingTab = filteredByStatus.where((p) {
@@ -1129,37 +1134,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       }
     }).toList();
 
-    bool matchesActiveCategory(PropertyModel p) {
-      final cat = p.categoryName.toLowerCase();
-      if (_activeCategoryTab == 'Residential') {
-        return cat.contains('resident') ||
-            cat.contains('apartment') ||
-            cat.contains('flat') ||
-            cat.contains('villa') ||
-            cat.contains('house') ||
-            cat.contains('bhk') ||
-            (!cat.contains('commercial') &&
-                !cat.contains('industrial') &&
-                !cat.contains('land') &&
-                !cat.contains('plot'));
-      } else if (_activeCategoryTab == 'Commercial') {
-        return cat.contains('commercial') ||
-            cat.contains('office') ||
-            cat.contains('shop') ||
-            cat.contains('showroom') ||
-            cat.contains('retail');
-      } else if (_activeCategoryTab == 'Industrial') {
-        return cat.contains('industrial') ||
-            cat.contains('factory') ||
-            cat.contains('warehouse') ||
-            cat.contains('shed');
-      } else if (_activeCategoryTab == 'Land & Plot') {
-        return cat.contains('land') || cat.contains('plot');
-      }
-      return false;
-    }
-
-    final filteredByListingAndCategory = filteredByListingTab.where(matchesActiveCategory).toList();
+    final filteredByListingAndCategory = filteredByListingTab.where(_matchesActiveCategory).toList();
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
@@ -1180,7 +1155,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: '$_selectedStatusFilter listings',
+          title: '${_selectedStatusFilter ?? "All Status"} listings',
           value: '$statusCount',
           icon: Icons.bolt_rounded,
           iconColor: CRMColors.primaryOf(context),
@@ -1226,7 +1201,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Commercial ($_selectedStatusFilter)',
+          title: 'Commercial (${_selectedStatusFilter ?? "All Status"})',
           value: '$statusCount',
           icon: Icons.business_center_outlined,
           iconColor: CRMColors.primaryOf(context),
@@ -1290,7 +1265,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Industrial ($_selectedStatusFilter)',
+          title: 'Industrial (${_selectedStatusFilter ?? "All Status"})',
           value: '$statusCount',
           icon: Icons.factory_outlined,
           iconColor: CRMColors.primaryOf(context),
@@ -1326,7 +1301,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         width: cardWidth,
         height: cardHeight,
         child: CRMKPICard(
-          title: 'Land & Plots ($_selectedStatusFilter)',
+          title: 'Land & Plots (${_selectedStatusFilter ?? "All Status"})',
           value: '$statusCount',
           icon: Icons.landscape_outlined,
           iconColor: CRMColors.primaryOf(context),
@@ -1435,13 +1410,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     children: [
                       searchField,
                       const SizedBox(height: CRMSpacing.s),
-                      Row(
-                        children: [
-                          Expanded(child: searchButton),
-                          const SizedBox(width: CRMSpacing.s),
-                          _buildStatusDropdown(),
-                        ],
-                      ),
+                      searchButton,
                     ],
                   );
                 }
@@ -1451,8 +1420,6 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     Expanded(child: searchField),
                     const SizedBox(width: CRMSpacing.s),
                     searchButton,
-                    const SizedBox(width: CRMSpacing.s),
-                    _buildStatusDropdown(),
                   ],
                 );
               },
@@ -1549,22 +1516,25 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                 }
 
                 final bool isWide = width >= 800;
+                final isRent = _activeListingTab == 'Rent';
+                final statusItems = isRent
+                    ? ['Available', 'Rented Out', 'To Be Available']
+                    : ['Available', 'Sold Out'];
 
                 if (isWide) {
                   return Row(
                     children: [
                       Expanded(
                         child: _buildDropdown(
-                          label: 'Category',
-                          value: _selectedCategory,
-                          items: categories
-                              .map((c) => DropdownMenuItem<String>(
-                                  value: c.id, child: Text(c.name)))
+                          label: 'Status',
+                          value: _selectedStatusFilter,
+                          items: statusItems
+                              .map((val) => DropdownMenuItem<String>(
+                                  value: val, child: Text(val)))
                               .toList(),
                           onChanged: (val) {
                             setState(() {
-                              _selectedCategory = val;
-                              _selectedConfigurations.clear();
+                              _selectedStatusFilter = val;
                               _currentPage = 0;
                             });
                             _loadProperties();
@@ -1674,16 +1644,15 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     runSpacing: CRMSpacing.m,
                     children: [
                       _buildDropdown(
-                        label: 'Category',
-                        value: _selectedCategory,
-                        items: categories
-                            .map((c) => DropdownMenuItem<String>(
-                                value: c.id, child: Text(c.name)))
+                        label: 'Status',
+                        value: _selectedStatusFilter,
+                        items: statusItems
+                            .map((val) => DropdownMenuItem<String>(
+                                value: val, child: Text(val)))
                             .toList(),
                         onChanged: (val) {
                           setState(() {
-                            _selectedCategory = val;
-                            _selectedConfigurations.clear();
+                            _selectedStatusFilter = val;
                             _currentPage = 0;
                           });
                           _loadProperties();
@@ -1796,7 +1765,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         setState(() {
           _activeListingTab = label;
           _currentPage = 0;
-          _selectedStatusFilter = 'Available';
+          _selectedStatusFilter = null;
         });
       },
       child: AnimatedContainer(
@@ -1860,12 +1829,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     );
   }
 
-  Widget _buildStatusDropdown() {
-    final isRent = _activeListingTab == 'Rent';
-    final items = isRent
-        ? ['Available', 'Rented Out', 'To Be Available']
-        : ['Available', 'Sold Out'];
-
+  Widget _buildCategoryDropdown(List<LookupItem> categories) {
     return Container(
       width: 180,
       height: 44,
@@ -1876,23 +1840,37 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         border: Border.all(color: CRMColors.borderOf(context).withOpacity(0.6), width: 1.0),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedStatusFilter,
-          items: items.map((String val) {
-            return DropdownMenuItem<String>(
-              value: val,
+        child: DropdownButton<String?>(
+          value: _selectedCategory,
+          hint: Text(
+            'All Category',
+            style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
+          ),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
               child: Text(
-                val,
+                'All Category',
                 style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
               ),
-            );
-          }).toList(),
-          onChanged: (String? newVal) {
-            if (newVal != null) {
-              setState(() {
-                _selectedStatusFilter = newVal;
-              });
-            }
+            ),
+            ...categories.map((c) {
+              return DropdownMenuItem<String?>(
+                value: c.id,
+                child: Text(
+                  c.name,
+                  style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textOf(context)),
+                ),
+              );
+            }),
+          ],
+          onChanged: (String? val) {
+            setState(() {
+              _selectedCategory = val;
+              _selectedConfigurations.clear();
+              _currentPage = 0;
+            });
+            _loadProperties();
           },
           icon: Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context)),
           dropdownColor: CRMColors.cardBgOf(context),
@@ -1915,7 +1893,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       _maxPrice = null;
       _currentPage = 0;
       _myAddedOnly = false;
-      _selectedStatusFilter = 'Available';
+      _selectedStatusFilter = null;
     });
     _loadProperties();
   }
@@ -2241,6 +2219,36 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       return 'Plot Area';
     }
     return 'BHK';
+  }
+
+  bool _matchesActiveCategory(PropertyModel p) {
+    final cat = p.categoryName.toLowerCase();
+    if (_activeCategoryTab == 'Residential') {
+      return cat.contains('resident') ||
+          cat.contains('apartment') ||
+          cat.contains('flat') ||
+          cat.contains('villa') ||
+          cat.contains('house') ||
+          cat.contains('bhk') ||
+          (!cat.contains('commercial') &&
+              !cat.contains('industrial') &&
+              !cat.contains('land') &&
+              !cat.contains('plot'));
+    } else if (_activeCategoryTab == 'Commercial') {
+      return cat.contains('commercial') ||
+          cat.contains('office') ||
+          cat.contains('shop') ||
+          cat.contains('showroom') ||
+          cat.contains('retail');
+    } else if (_activeCategoryTab == 'Industrial') {
+      return cat.contains('industrial') ||
+          cat.contains('factory') ||
+          cat.contains('warehouse') ||
+          cat.contains('shed');
+    } else if (_activeCategoryTab == 'Land & Plot') {
+      return cat.contains('land') || cat.contains('plot');
+    }
+    return false;
   }
 
   String _getPropertyBhkOrAreaValue(PropertyModel p) {

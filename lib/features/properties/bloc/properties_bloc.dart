@@ -17,6 +17,7 @@ class LoadPropertiesEvent extends PropertiesEvent {
   final bool? isVerified;
   final bool? includeDeleted;
   final String activeTab; // 'All', 'My Active', 'My Deleted', 'Shortlisted'
+  final bool refreshFromServer;
 
   LoadPropertiesEvent({
     this.search,
@@ -27,6 +28,7 @@ class LoadPropertiesEvent extends PropertiesEvent {
     this.isVerified,
     this.includeDeleted,
     required this.activeTab,
+    this.refreshFromServer = true,
   });
 }
 
@@ -141,13 +143,33 @@ class PropertiesBloc extends Bloc<PropertiesEvent, PropertiesState> {
 
     _propertiesSubscription = RepositoryCoordinator().propertiesStream.listen((_) {
       if (_lastLoadEvent != null) {
-        add(_lastLoadEvent!);
+        add(LoadPropertiesEvent(
+          search: _lastLoadEvent!.search,
+          categoryId: _lastLoadEvent!.categoryId,
+          areaId: _lastLoadEvent!.areaId,
+          listingTypeId: _lastLoadEvent!.listingTypeId,
+          createdBy: _lastLoadEvent!.createdBy,
+          isVerified: _lastLoadEvent!.isVerified,
+          includeDeleted: _lastLoadEvent!.includeDeleted,
+          activeTab: _lastLoadEvent!.activeTab,
+          refreshFromServer: false,
+        ));
       }
     });
 
     _lookupsSubscription = RepositoryCoordinator().lookupsStream.listen((_) {
       if (_lastLoadEvent != null) {
-        add(_lastLoadEvent!);
+        add(LoadPropertiesEvent(
+          search: _lastLoadEvent!.search,
+          categoryId: _lastLoadEvent!.categoryId,
+          areaId: _lastLoadEvent!.areaId,
+          listingTypeId: _lastLoadEvent!.listingTypeId,
+          createdBy: _lastLoadEvent!.createdBy,
+          isVerified: _lastLoadEvent!.isVerified,
+          includeDeleted: _lastLoadEvent!.includeDeleted,
+          activeTab: _lastLoadEvent!.activeTab,
+          refreshFromServer: false,
+        ));
       }
     });
   }
@@ -186,7 +208,10 @@ class PropertiesBloc extends Bloc<PropertiesEvent, PropertiesState> {
       List<PropertyModel> properties = [];
       
       if (event.activeTab == 'Shortlisted') {
-        final allProps = await _repository.getProperties(search: event.search);
+        final allProps = await _repository.getProperties(
+          search: event.search,
+          refreshFromServer: event.refreshFromServer,
+        );
         properties = allProps.where((p) => bookmarked.contains(p.id)).toList();
       } else {
         bool? includeDeleted = event.includeDeleted;
@@ -204,6 +229,7 @@ class PropertiesBloc extends Bloc<PropertiesEvent, PropertiesState> {
           createdBy: event.createdBy,
           isVerified: event.isVerified,
           includeDeleted: includeDeleted,
+          refreshFromServer: event.refreshFromServer,
         );
       }
 
@@ -251,14 +277,23 @@ class PropertiesBloc extends Bloc<PropertiesEvent, PropertiesState> {
     UpdatePropertyEvent event,
     Emitter<PropertiesState> emit,
   ) async {
-    emit(PropertiesLoading());
     try {
       final saved = await _repository.updateProperty(event.id, event.propertyData);
-      emit(PropertyUpdatedState(saved));
-      add(LoadPropertiesEvent(activeTab: event.activeTab));
+      if (state is PropertiesLoaded) {
+        final current = state as PropertiesLoaded;
+        final updatedList = current.properties.map((p) => p.id == saved.id ? saved : p).toList();
+        emit(PropertiesLoaded(
+          properties: updatedList,
+          metadata: current.metadata,
+          bookmarkedIds: current.bookmarkedIds,
+          activeTab: current.activeTab,
+        ));
+      } else {
+        emit(PropertyUpdatedState(saved));
+        add(LoadPropertiesEvent(activeTab: event.activeTab));
+      }
     } catch (e) {
       emit(PropertiesError(e.toString()));
-      add(LoadPropertiesEvent(activeTab: event.activeTab));
     }
   }
 
@@ -267,11 +302,21 @@ class PropertiesBloc extends Bloc<PropertiesEvent, PropertiesState> {
     Emitter<PropertiesState> emit,
   ) async {
     try {
-      await _repository.togglePropertyVerification(event.id, event.isVerified);
-      add(LoadPropertiesEvent(activeTab: event.activeTab));
+      final saved = await _repository.togglePropertyVerification(event.id, event.isVerified);
+      if (state is PropertiesLoaded) {
+        final current = state as PropertiesLoaded;
+        final updatedList = current.properties.map((p) => p.id == saved.id ? saved : p).toList();
+        emit(PropertiesLoaded(
+          properties: updatedList,
+          metadata: current.metadata,
+          bookmarkedIds: current.bookmarkedIds,
+          activeTab: current.activeTab,
+        ));
+      } else {
+        add(LoadPropertiesEvent(activeTab: event.activeTab));
+      }
     } catch (e) {
       emit(PropertiesError(e.toString()));
-      add(LoadPropertiesEvent(activeTab: event.activeTab));
     }
   }
 
