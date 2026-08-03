@@ -25,6 +25,8 @@ import '../../features/settings/screens/location_config_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/properties/screens/recycle_bin_screen.dart';
 import '../network/sync_manager.dart';
+import '../storage/secure_storage.dart';
+import '../storage/session_cleanup.dart';
 import '../../features/requirements/screens/share_properties_page.dart';
 import '../../features/requirements/screens/public_property_detail_screen.dart';
 import '../security/role_guard.dart';
@@ -183,7 +185,7 @@ class AppRouter {
         },
       ),
     ],
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final authState = authBloc.state;
       final loggingIn = state.matchedLocation == '/login';
       final onSplash = state.matchedLocation == '/splash';
@@ -194,6 +196,19 @@ class AppRouter {
       final isAuthGate = loggingIn || onSplash || onGetStarted || isPublicShare;
 
       if (authState is Authenticated) {
+        // Check 9-hour inactivity timeout
+        final secureStorage = SecureStorage();
+        final isInactiveExpired = await secureStorage.isSessionExpiredDueToInactivity();
+        if (isInactiveExpired) {
+          await SessionCleanup.clearLocalSession(clearToken: true);
+          authBloc.add(AuthSessionExpired());
+          final target = state.uri.toString();
+          return '/get-started?from=${Uri.encodeComponent(target)}';
+        }
+        
+        // Otherwise, update last activity timestamp since they are active
+        await secureStorage.updateLastActivity();
+
         final role = authState.user.role;
 
         // Trigger background sync if not completed and not already syncing.
