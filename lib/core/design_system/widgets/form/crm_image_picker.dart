@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:propkart/core/api/dio_client.dart';
+import 'package:propkart/core/api/cloudinary_uploader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../tokens/app_colors.dart';
 import '../../tokens/app_spacing.dart';
@@ -82,18 +83,14 @@ class _CRMImagePickerState extends State<CRMImagePicker> {
     });
 
     try {
-      MultipartFile multipartFile;
+      List<int> uploadBytes;
+      String filename = pickedFile.name;
 
       if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
-        if (bytes.length > 5 * 1024 * 1024) {
-          throw Exception("Image size exceeds the 5 MB file limit.");
+        uploadBytes = await pickedFile.readAsBytes();
+        if (uploadBytes.length > 10 * 1024 * 1024) {
+          throw Exception("Image size exceeds the 10 MB file limit.");
         }
-        multipartFile = MultipartFile.fromBytes(
-          bytes,
-          filename: pickedFile.name,
-          contentType: MediaType('image', 'jpeg'),
-        );
       } else {
         final File file = File(pickedFile.path);
         final String targetPath = "${Directory.systemTemp.path}/compressed_img_${DateTime.now().millisecondsSinceEpoch}.jpg";
@@ -109,30 +106,22 @@ class _CRMImagePickerState extends State<CRMImagePicker> {
         File uploadFile = file;
         if (compressedFile != null) {
           uploadFile = File(compressedFile.path);
+          filename = 'upload_image.jpg';
         }
 
-        int compressedSize = await uploadFile.length();
-        if (compressedSize > 5 * 1024 * 1024) {
-          throw Exception("Compressed image exceeds the 5 MB file limit.");
+        uploadBytes = await uploadFile.readAsBytes();
+        if (uploadBytes.length > 10 * 1024 * 1024) {
+          throw Exception("Compressed image exceeds the 10 MB file limit.");
         }
-
-        multipartFile = await MultipartFile.fromFile(
-          uploadFile.path, 
-          filename: 'upload_image.jpg',
-          contentType: MediaType('image', 'jpeg'),
-        );
       }
 
-      final formData = FormData.fromMap({
-        'file': multipartFile,
-      });
-
-      final response = await DioClient.dio.post(
-        widget.uploadEndpoint,
-        data: formData,
+      final publicUrl = await CloudinaryUploader.upload(
+        bytes: uploadBytes,
+        filename: filename,
+        mimeType: 'image/jpeg',
+        resourceType: 'image',
+        fallbackEndpoint: widget.uploadEndpoint,
       );
-      
-      final publicUrl = response.data['data']['url'];
 
       setState(() {
         if (index < widget.imageUrls.length) {
@@ -203,18 +192,14 @@ class _CRMImagePickerState extends State<CRMImagePicker> {
 
     try {
       for (final pickedFile in filesToUpload) {
-        MultipartFile multipartFile;
+        List<int> uploadBytes;
+        String filename = pickedFile.name;
 
         if (kIsWeb) {
-          final bytes = await pickedFile.readAsBytes();
-          if (bytes.length > 5 * 1024 * 1024) {
-            throw Exception("Image size exceeds the 5 MB file limit.");
+          uploadBytes = await pickedFile.readAsBytes();
+          if (uploadBytes.length > 10 * 1024 * 1024) {
+            throw Exception("Image size exceeds the 10 MB file limit.");
           }
-          multipartFile = MultipartFile.fromBytes(
-            bytes,
-            filename: pickedFile.name,
-            contentType: MediaType('image', 'jpeg'),
-          );
         } else {
           final File file = File(pickedFile.path);
           final String targetPath = "${Directory.systemTemp.path}/compressed_img_${DateTime.now().millisecondsSinceEpoch}.jpg";
@@ -230,30 +215,22 @@ class _CRMImagePickerState extends State<CRMImagePicker> {
           File uploadFile = file;
           if (compressedFile != null) {
             uploadFile = File(compressedFile.path);
+            filename = 'upload_image.jpg';
           }
 
-          int compressedSize = await uploadFile.length();
-          if (compressedSize > 5 * 1024 * 1024) {
-            throw Exception("Compressed image exceeds the 5 MB file limit.");
+          uploadBytes = await uploadFile.readAsBytes();
+          if (uploadBytes.length > 10 * 1024 * 1024) {
+            throw Exception("Compressed image exceeds the 10 MB file limit.");
           }
-
-          multipartFile = await MultipartFile.fromFile(
-            uploadFile.path, 
-            filename: 'upload_image.jpg',
-            contentType: MediaType('image', 'jpeg'),
-          );
         }
 
-        final formData = FormData.fromMap({
-          'file': multipartFile,
-        });
-
-        final response = await DioClient.dio.post(
-          widget.uploadEndpoint,
-          data: formData,
+        final publicUrl = await CloudinaryUploader.upload(
+          bytes: uploadBytes,
+          filename: filename,
+          mimeType: 'image/jpeg',
+          resourceType: 'image',
+          fallbackEndpoint: widget.uploadEndpoint,
         );
-        
-        final publicUrl = response.data['data']['url'];
         
         if (mounted) {
           widget.onImageAdded(publicUrl);

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -7,6 +8,36 @@ import 'dio_credentials_stub.dart'
 import 'api_constants.dart';
 import 'interceptors.dart';
 import 'fallback_interceptor.dart';
+
+/// Interceptor to automatically parse JSON strings into Map/List on platforms (like Web)
+/// where the native HTTP client or Dio transformer doesn't decode it automatically.
+class JsonDecoderInterceptor extends Interceptor {
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    if (response.data is String) {
+      final str = response.data.toString().trim();
+      if (str.startsWith('{') || str.startsWith('[')) {
+        try {
+          response.data = jsonDecode(str);
+        } catch (_) {}
+      }
+    }
+    super.onResponse(response, handler);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response != null && err.response!.data is String) {
+      final str = err.response!.data.toString().trim();
+      if (str.startsWith('{') || str.startsWith('[')) {
+        try {
+          err.response!.data = jsonDecode(str);
+        } catch (_) {}
+      }
+    }
+    super.onError(err, handler);
+  }
+}
 
 class DioClient {
   static final Dio dio = _initDio();
@@ -25,6 +56,7 @@ class DioClient {
     );
 
     credentials.configureDioCredentials(dioInstance);
+    dioInstance.interceptors.add(JsonDecoderInterceptor());
     dioInstance.interceptors.add(JwtInterceptor());
     dioInstance.interceptors.add(FallbackInterceptor());
     return dioInstance;

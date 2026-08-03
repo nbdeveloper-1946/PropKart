@@ -15,14 +15,10 @@ class SecureStorage {
   /// Web cookie-session marker (not a secret — cookies hold the tokens).
   static bool webCookieSession = false;
 
-  /// On web: keep access token in memory only as fallback when cookies are blocked.
-  /// Never persist JWTs to disk/localStorage on web.
+  /// On web and mobile: persist access token to storage.
   Future<void> saveToken(String token, {bool persist = true}) async {
     inMemoryToken = token;
     await _storage.delete(key: _tokenKey);
-    if (kIsWeb && !kDebugMode) {
-      return;
-    }
     if (persist) {
       await _storage.write(key: _tokenKey, value: token);
     }
@@ -31,11 +27,6 @@ class SecureStorage {
   Future<void> saveRefreshToken(String? refreshToken, {bool persist = true}) async {
     inMemoryRefreshToken = refreshToken;
     await _storage.delete(key: _refreshTokenKey);
-    if (kIsWeb && !kDebugMode) {
-      // Refresh stays in HttpOnly cookie on web — do not persist to JS storage.
-      inMemoryRefreshToken = null;
-      return;
-    }
     if (refreshToken == null || refreshToken.isEmpty) return;
     if (persist) {
       await _storage.write(key: _refreshTokenKey, value: refreshToken);
@@ -60,11 +51,10 @@ class SecureStorage {
   }
 
   Future<String?> getToken() async {
-    return inMemoryToken ?? (kIsWeb && !kDebugMode ? null : await _storage.read(key: _tokenKey));
+    return inMemoryToken ?? await _storage.read(key: _tokenKey);
   }
 
   Future<String?> getRefreshToken() async {
-    if (kIsWeb && !kDebugMode) return null;
     return inMemoryRefreshToken ?? await _storage.read(key: _refreshTokenKey);
   }
 
@@ -75,5 +65,21 @@ class SecureStorage {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _webSessionHintKey);
+    await _storage.delete(key: 'last_activity_time');
+  }
+
+  Future<void> updateLastActivity() async {
+    final now = DateTime.now().millisecondsSinceEpoch.toString();
+    await _storage.write(key: 'last_activity_time', value: now);
+  }
+
+  Future<bool> isSessionExpiredDueToInactivity() async {
+    final lastTimeStr = await _storage.read(key: 'last_activity_time');
+    if (lastTimeStr == null) return false;
+    final lastTime = int.tryParse(lastTimeStr);
+    if (lastTime == null) return false;
+    final diff = DateTime.now().millisecondsSinceEpoch - lastTime;
+    // 9 hours in milliseconds = 9 * 60 * 60 * 1000 = 32,400,000 ms
+    return diff > 32400000;
   }
 }

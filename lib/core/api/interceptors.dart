@@ -59,6 +59,10 @@ class JwtInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     try {
+      if (!_matchesAny(options.path, _publicPrefixes)) {
+        await _secureStorage.updateLastActivity();
+      }
+
       if (kIsWeb) {
         options.headers['X-Auth-Transport'] = 'cookie';
         if (!_matchesAny(options.path, _publicPrefixes)) {

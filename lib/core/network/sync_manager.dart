@@ -51,6 +51,15 @@ class SyncManager {
   bool isSyncCompleted = false;
   final ValueNotifier<bool> isSyncing = ValueNotifier<bool>(false);
 
+  Future<bool> hasLocalCache() async {
+    try {
+      final count = await _coordinator.lookupLocal.getLookupsCount();
+      return count > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> performStartupSync() async {
     isSyncing.value = true;
     try {
