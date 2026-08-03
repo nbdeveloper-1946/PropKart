@@ -274,7 +274,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       availableTitle = 'Available Inventory';
       siteVisitTitle = 'Site visits done';
       requirementsTitle = 'Leads';
-      wonTitle = 'won';
+      wonTitle = 'Won';
     }
 
     final List<Widget> cards = [

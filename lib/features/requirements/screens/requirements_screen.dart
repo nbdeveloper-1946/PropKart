@@ -74,6 +74,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     super.initState();
     _loadMetadata();
     _triggerFetch();
+    context.read<UsersBloc>().add(const FetchUsers());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -217,29 +218,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   }
 
   bool _isValidStatusTransition(String currentStatus, String newStatus) {
-    if (newStatus == 'Not Interested' || newStatus == 'Bin') return true;
-
-    // Map legacy status strings to new pipeline statuses for backward compatibility
-    String mappedCurrent = currentStatus;
-    if (mappedCurrent == 'Active' || mappedCurrent == 'Live') mappedCurrent = 'Interested';
-    if (mappedCurrent == 'Closed' || mappedCurrent == 'Won') mappedCurrent = 'Won';
-    if (mappedCurrent == 'Suspended' || mappedCurrent == 'Dead') mappedCurrent = 'Not Interested';
-
-    // From Won (My Won tab), allow moving back to any earlier pipeline stage.
-    if (mappedCurrent == 'Won') return true;
-
-    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Site Visit Done', 'Negotiation', 'Won'];
-    final currentIndex = steps.indexOf(mappedCurrent);
-    final newIndex = steps.indexOf(newStatus);
-
-    if (currentIndex == -1 || newIndex == -1) return true;
-
-    if (newIndex <= currentIndex + 1 || 
-        (mappedCurrent == 'Interested' && (newStatus == 'Site Visit' || newStatus == 'Site Visit Done')) ||
-        (mappedCurrent == 'Follow-up' && newStatus == 'Site Visit Done')) {
-      return true;
-    }
-    return false;
+    return true;
   }
 
   void _changeStatus(RequirementModel req, String newStatus) {
@@ -680,14 +659,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       items: const [
                         DropdownMenuItem(value: "All", child: Text("All")),
                         DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
-                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                         DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
-                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
                         DropdownMenuItem(value: "Bin", child: Text("Bin")),
+                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
                       ],
                       isMobile: isMobile,
                       onChanged: (val) {
@@ -742,14 +721,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                       items: const [
                         DropdownMenuItem(value: "All", child: Text("All")),
                         DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
-                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
                         DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
-                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit")),
+                        DropdownMenuItem(value: "Interested", child: Text("Interested")),
+                        DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                         DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                         DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                         DropdownMenuItem(value: "Won", child: Text("Won")),
-                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
                         DropdownMenuItem(value: "Bin", child: Text("Bin")),
+                        DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
                       ],
                       isMobile: isMobile,
                       onChanged: (val) {
@@ -865,6 +844,82 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
     return 'N/A';
   }
 
+  Widget _buildAssignToDropdown(RequirementModel req) {
+    return BlocBuilder<UsersBloc, UsersState>(
+      builder: (context, state) {
+        if (state is UsersLoaded) {
+          final salesmen = state.users
+              .where((u) => u.roleName.toLowerCase() == 'sales')
+              .toList();
+          final currentAdminId = req.adminId?.isEmpty == true ? null : req.adminId;
+          final bool hasValue = currentAdminId != null && salesmen.any((u) => u.id == currentAdminId);
+          final dropdownValue = hasValue ? currentAdminId : null;
+          return DropdownButton<String?>(
+            value: dropdownValue,
+            hint: Text(
+              'Assign to',
+              style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
+            ),
+            underline: Container(),
+            items: [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text(
+                  'Unassigned',
+                  style: CRMTypography.bodyMedium.copyWith(color: CRMColors.textSecondaryOf(context)),
+                ),
+              ),
+              ...salesmen.map((u) {
+                return DropdownMenuItem<String?>(
+                  value: u.id,
+                  child: Text(
+                    u.fullName,
+                    style: CRMTypography.bodyMedium.copyWith(
+                      color: CRMColors.textOf(context),
+                      fontWeight: u.id == currentAdminId ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                );
+              }),
+            ],
+            onChanged: (String? newSalesmanId) {
+              String? newSalesmanName;
+              if (newSalesmanId != null) {
+                final u = salesmen.firstWhere((s) => s.id == newSalesmanId);
+                newSalesmanName = u.fullName;
+              }
+              
+              context.read<RequirementsBloc>().add(
+                UpdateRequirementEvent(
+                  req.copyWith(
+                    adminId: newSalesmanId ?? '',
+                    assigneeName: newSalesmanName ?? '',
+                  ),
+                ),
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(newSalesmanName != null 
+                      ? 'Lead assigned to $newSalesmanName successfully.'
+                      : 'Lead unassigned successfully.'),
+                  backgroundColor: CRMColors.success,
+                ),
+              );
+            },
+            icon: Icon(Icons.arrow_drop_down, color: CRMColors.textSecondaryOf(context), size: 18),
+            dropdownColor: CRMColors.cardBgOf(context),
+          );
+        }
+        return const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+      },
+    );
+  }
+
   bool _hasEditAccess(RequirementModel r, UserModel? currentUser) {
     if (currentUser == null) return false;
     if (currentUser.role == 'Super Admin') return true;
@@ -978,8 +1033,10 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                   dataRowMaxHeight: 64.0,
                   columns: [
                     const DataColumn(label: Text('Client')),
-                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                    if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin')) ...[
                       const DataColumn(label: Text('Added By')),
+                      const DataColumn(label: Text('Assign to')),
+                    ],
                     const DataColumn(label: Text('Specs / Config')),
                     const DataColumn(label: Text('Budget Range')),
                     const DataColumn(label: Text('Target Area(s)')),
@@ -1031,13 +1088,17 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             ],
                           ),
                         ),
-                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin'))
+                        if (currentUser != null && (currentUser.role == 'Super Admin' || currentUser.role == 'Admin')) ...[
                           DataCell(
                             Text(
                               _getSalesmanName(req, currentUser),
                               style: CRMTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
+                          DataCell(
+                            _buildAssignToDropdown(req),
+                          ),
+                        ],
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1091,14 +1152,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             onSelected: (String newStatus) => _changeStatus(req, newStatus),
                             itemBuilder: (BuildContext context) => const [
                               PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                               PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                               PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                             ],
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,
@@ -1510,14 +1571,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                         onSelected: (String newStatus) => _changeStatus(req, newStatus),
                         itemBuilder: (BuildContext context) => const [
                           PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                          PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                           PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                          PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                          PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                          PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                           PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                           PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                           PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                          PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                           PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                          PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                         ],
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: CRMSpacing.s, vertical: CRMSpacing.xxs),
@@ -2504,14 +2565,14 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
                             onSelected: (String newStatus) => _changeStatus(req, newStatus),
                             itemBuilder: (BuildContext context) => const [
                               PopupMenuItem<String>(value: 'Not Started', child: Text('Not Started')),
-                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
                               PopupMenuItem<String>(value: 'Follow-up', child: Text('Follow-up')),
-                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit')),
+                              PopupMenuItem<String>(value: 'Interested', child: Text('Interested')),
+                              PopupMenuItem<String>(value: 'Site Visit', child: Text('Site Visit Sche.')),
                               PopupMenuItem<String>(value: 'Site Visit Done', child: Text('Site Visit Done')),
                               PopupMenuItem<String>(value: 'Negotiation', child: Text('Negotiation')),
                               PopupMenuItem<String>(value: 'Won', child: Text('Won')),
-                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                               PopupMenuItem<String>(value: 'Bin', child: Text('Bin')),
+                              PopupMenuItem<String>(value: 'Not Interested', child: Text('Not Interested')),
                             ],
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,

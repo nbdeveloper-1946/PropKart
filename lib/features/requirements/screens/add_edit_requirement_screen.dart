@@ -298,34 +298,7 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
   }
 
   bool _validateStatusTransition(String newStatus) {
-    if (widget.requirement == null) return true;
-    final currentStatus = widget.requirement!.status;
-    
-    if (newStatus == 'Not Interested' || newStatus == 'Bin') return true;
-    
-    // Map legacy status strings to new pipeline statuses for backward compatibility
-    String mappedCurrent = currentStatus;
-    if (mappedCurrent == 'Active' || mappedCurrent == 'Live') mappedCurrent = 'Interested';
-    
-    final steps = ['Not Started', 'Interested', 'Follow-up', 'Site Visit', 'Site Visit Done', 'Negotiation', 'Won'];
-    final currentIndex = steps.indexOf(mappedCurrent);
-    final newIndex = steps.indexOf(newStatus);
-    
-    if (currentIndex == -1 || newIndex == -1) return true;
-    
-    if (newIndex <= currentIndex + 1 || 
-        (mappedCurrent == 'Interested' && (newStatus == 'Site Visit' || newStatus == 'Site Visit Done')) ||
-        (mappedCurrent == 'Follow-up' && newStatus == 'Site Visit Done')) {
-      return true;
-    }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Cannot skip pipeline stages from '$currentStatus' to '$newStatus'."),
-        backgroundColor: CRMColors.warning,
-      ),
-    );
-    return false;
+    return true;
   }
 
   void _submitForm() async {
@@ -874,14 +847,14 @@ class _AddEditRequirementScreenState extends State<AddEditRequirementScreen> {
               value: _selectedStatus,
               items: const [
                 DropdownMenuItem(value: "Not Started", child: Text("Not Started")),
-                DropdownMenuItem(value: "Interested", child: Text("Interested")),
                 DropdownMenuItem(value: "Follow-up", child: Text("Follow-up")),
+                DropdownMenuItem(value: "Interested", child: Text("Interested")),
                 DropdownMenuItem(value: "Site Visit", child: Text("Site Visit Sche.")),
                 DropdownMenuItem(value: "Site Visit Done", child: Text("Site Visit Done")),
                 DropdownMenuItem(value: "Negotiation", child: Text("Negotiation")),
                 DropdownMenuItem(value: "Won", child: Text("Won")),
-                DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
                 DropdownMenuItem(value: "Bin", child: Text("Bin")),
+                DropdownMenuItem(value: "Not Interested", child: Text("Not Interested")),
               ],
               onChanged: (val) {
                 if (val != null && _validateStatusTransition(val)) {

@@ -145,7 +145,11 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     FetchUsers event,
     Emitter<UsersState> emit,
   ) async {
-    emit(UsersLoading());
+    if (_cachedUsers.isNotEmpty) {
+      emit(UsersLoaded(users: _cachedUsers, roles: _cachedRoles));
+    } else {
+      emit(UsersLoading());
+    }
     try {
       if (_cachedRoles.isEmpty) {
         _cachedRoles = await _usersRepository.getRoles();
