@@ -196,6 +196,13 @@ class AppRouter {
       if (authState is Authenticated) {
         final role = authState.user.role;
 
+        // Trigger background sync if not completed and not already syncing.
+        if (!SyncManager().isSyncCompleted && !SyncManager().isSyncing.value) {
+          SyncManager().performStartupSync().catchError((e) {
+            debugPrint("Background sync error: $e");
+          });
+        }
+
         if (onUsers && !RoleGuard.canManageEmployees(role)) {
           return '/dashboard';
         }
@@ -225,10 +232,9 @@ class AppRouter {
         return null;
       }
 
-      if (!isAuthGate) {
-        final target = state.uri.toString();
-        return '/splash?from=${Uri.encodeComponent(target)}';
-      }
+      // If authentication state is still initializing/loading (AuthInitial/AuthLoading),
+      // we do not force a redirect to the splash screen. This allows deep links and hard refreshes
+      // to stay on their target route while the auth check completes.
       return null;
     },
   );
